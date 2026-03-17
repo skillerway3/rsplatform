@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "../lib/supabase";
-
+import { useRouter } from "next/navigation";
+import { supabase } from "@/app/lib/supabase";
 
 export default function LoginPage() {
+  const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,14 +24,14 @@ export default function LoginPage() {
       password,
     });
 
-    setLoading(false);
-
     if (error) {
+      setLoading(false);
       setErr(error.message);
       return;
     }
 
-    setMsg("Logged in successfully ✅");
+    router.push("/orders");
+    router.refresh();
   }
 
   return (
@@ -55,7 +57,9 @@ export default function LoginPage() {
       >
         <h1 style={{ margin: "0 0 14px", textAlign: "center" }}>Login</h1>
 
-        <label style={{ display: "block", marginBottom: 6, opacity: 0.9 }}>Email</label>
+        <label style={{ display: "block", marginBottom: 6, opacity: 0.9 }}>
+          Email
+        </label>
         <input
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -65,7 +69,9 @@ export default function LoginPage() {
           style={inputStyle}
         />
 
-        <label style={{ display: "block", margin: "12px 0 6px", opacity: 0.9 }}>
+        <label
+          style={{ display: "block", margin: "12px 0 6px", opacity: 0.9 }}
+        >
           Password
         </label>
         <input
@@ -96,12 +102,26 @@ export default function LoginPage() {
         </button>
 
         {msg && (
-          <p style={{ marginTop: 12, color: "#93c5fd", fontSize: 14, textAlign: "center" }}>
+          <p
+            style={{
+              marginTop: 12,
+              color: "#93c5fd",
+              fontSize: 14,
+              textAlign: "center",
+            }}
+          >
             {msg}
           </p>
         )}
         {err && (
-          <p style={{ marginTop: 12, color: "#fca5a5", fontSize: 14, textAlign: "center" }}>
+          <p
+            style={{
+              marginTop: 12,
+              color: "#fca5a5",
+              fontSize: 14,
+              textAlign: "center",
+            }}
+          >
             {err}
           </p>
         )}
