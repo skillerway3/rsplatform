@@ -6,9 +6,18 @@ import { formatCurrency } from '@/lib/utils';
 interface DashboardStatsProps {
   listingCount: number;
   orderCount: number;
+  totalRevenue: number;
+  unreadMessages?: number;
+  pendingOrders?: number;
 }
 
-export function DashboardStats({ listingCount, orderCount }: DashboardStatsProps) {
+export function DashboardStats({ 
+  listingCount, 
+  orderCount, 
+  totalRevenue, 
+  unreadMessages = 0,
+  pendingOrders = 0
+}: DashboardStatsProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       <Card className="premium-card p-8 group hover:border-amber-500/30 transition-all">
@@ -18,12 +27,12 @@ export function DashboardStats({ listingCount, orderCount }: DashboardStatsProps
           </div>
           <div className="flex items-center text-emerald-500 text-[9px] font-black uppercase tracking-widest">
             <ArrowUpRight className="w-3 h-3 mr-1" />
-            +12.5%
+            Live
           </div>
         </div>
         <div className="space-y-1">
           <div className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Total Revenue</div>
-          <div className="text-3xl font-black text-zinc-100 tracking-tighter">{formatCurrency(12450.00)}</div>
+          <div className="text-3xl font-black text-zinc-100 tracking-tighter">{formatCurrency(totalRevenue)}</div>
         </div>
       </Card>
 
@@ -34,7 +43,7 @@ export function DashboardStats({ listingCount, orderCount }: DashboardStatsProps
           </div>
           <div className="flex items-center text-emerald-500 text-[9px] font-black uppercase tracking-widest">
             <ArrowUpRight className="w-3 h-3 mr-1" />
-            +4
+            Active
           </div>
         </div>
         <div className="space-y-1">
@@ -49,7 +58,7 @@ export function DashboardStats({ listingCount, orderCount }: DashboardStatsProps
             <CreditCard className="w-5 h-5 text-blue-500" />
           </div>
           <div className="flex items-center text-zinc-500 text-[9px] font-black uppercase tracking-widest">
-            0 Pending
+            {pendingOrders} Pending
           </div>
         </div>
         <div className="space-y-1">
@@ -64,12 +73,12 @@ export function DashboardStats({ listingCount, orderCount }: DashboardStatsProps
             <MessageSquare className="w-5 h-5 text-zinc-100" />
           </div>
           <div className="flex items-center text-amber-500 text-[9px] font-black uppercase tracking-widest">
-            2 New
+            {unreadMessages > 0 ? `${unreadMessages} New` : 'No New'}
           </div>
         </div>
         <div className="space-y-1">
           <div className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Unread Messages</div>
-          <div className="text-3xl font-black text-zinc-100 tracking-tighter">12</div>
+          <div className="text-3xl font-black text-zinc-100 tracking-tighter">{unreadMessages}</div>
         </div>
       </Card>
     </div>

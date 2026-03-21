@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS listings (
   game TEXT NOT NULL,
   category TEXT NOT NULL,
   images TEXT[],
+  metadata JSONB DEFAULT '{}'::jsonb,
   status TEXT DEFAULT 'active', -- active, sold, hidden
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -280,66 +281,25 @@ CREATE POLICY "Sellers can insert proofs for their orders" ON buyer_request_proo
 
 ALTER TABLE buyer_requests ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Buyers can manage their own requests" ON buyer_requests;
+CREATE POLICY "Buyers can manage their own requests" ON buyer_requests FOR ALL USING (auth.uid() = buyer_id);
 DROP POLICY IF EXISTS "Sellers can view open requests" ON buyer_requests;
-DROP POLICY IF EXISTS "Buyers can insert own requests" ON buyer_requests;
-DROP POLICY IF EXISTS "Buyers can update own requests" ON buyer_requests;
-DROP POLICY IF EXISTS "Buyers can view own requests" ON buyer_requests;
-
-CREATE POLICY "Buyers can insert own requests"
-ON buyer_requests
-FOR INSERT
-WITH CHECK (auth.uid() = buyer_id);
-
-CREATE POLICY "Buyers can update own requests"
-ON buyer_requests
-FOR UPDATE
-USING (auth.uid() = buyer_id)
-WITH CHECK (auth.uid() = buyer_id);
-
-CREATE POLICY "Buyers can view own requests"
-ON buyer_requests
-FOR SELECT
-USING (auth.uid() = buyer_id);
-
-CREATE POLICY "Sellers can view open requests"
-ON buyer_requests
-FOR SELECT
-USING (status = 'open');
+CREATE POLICY "Sellers can view open requests" ON buyer_requests FOR SELECT USING (
+  status = 'open' OR 
+  auth.uid() = (SELECT seller_id FROM buyer_request_offers WHERE id = accepted_offer_id)
+);
 
 ALTER TABLE buyer_request_offers ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Sellers can manage their own offers" ON buyer_request_offers;
+CREATE POLICY "Sellers can manage their own offers" ON buyer_request_offers FOR ALL USING (auth.uid() = seller_id);
 DROP POLICY IF EXISTS "Buyers can view offers for their requests" ON buyer_request_offers;
-DROP POLICY IF EXISTS "Verified sellers can create offers" ON buyer_request_offers;
-DROP POLICY IF EXISTS "Sellers can create offers" ON buyer_request_offers;
-
-CREATE POLICY "Buyers can view offers for their requests"
-ON buyer_request_offers
-FOR SELECT
-USING (
-  auth.uid() = seller_id
-  OR EXISTS (
-    SELECT 1
-    FROM buyer_requests br
-    WHERE br.id = request_id
-      AND br.buyer_id = auth.uid()
-  )
+CREATE POLICY "Buyers can view offers for their requests" ON buyer_request_offers FOR SELECT USING (
+  EXISTS (SELECT 1 FROM buyer_requests WHERE id = request_id AND auth.uid() = buyer_id)
 );
-
-CREATE POLICY "Verified sellers can create offers"
-ON buyer_request_offers
-FOR INSERT
-WITH CHECK (
-  auth.uid() = seller_id
-  AND EXISTS (
-    SELECT 1 FROM profiles WHERE id = auth.uid() AND is_verified_seller = true
-  )
-  AND EXISTS (
-    SELECT 1
-    FROM buyer_requests br
-    WHERE br.id = request_id
-      AND br.status = 'open'
-      AND br.expires_at > NOW()
-  )
+DROP POLICY IF EXISTS "Verified sellers can create offers" ON buyer_request_offers;
+CREATE POLICY "Verified sellers can create offers" ON buyer_request_offers FOR INSERT WITH CHECK (
+  auth.uid() = seller_id AND 
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_verified_seller = true) AND
+  EXISTS (SELECT 1 FROM buyer_requests WHERE id = request_id AND status = 'open' AND expires_at > NOW())
 );
 
 ALTER TABLE buyer_request_threads ENABLE ROW LEVEL SECURITY;

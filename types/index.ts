@@ -54,6 +54,8 @@ export interface Listing {
   isFeatured?: boolean;
   createdAt: string;
   accountMetadata?: AccountMetadata;
+  metadata?: any;
+  seller?: User;
 }
 
 export interface Order {

@@ -12,10 +12,11 @@ import { SellStepDetails } from './SellStepDetails';
 import { SellStepAccountDetails } from './SellStepAccountDetails';
 import { SellStepPricing } from './SellStepPricing';
 import { SellStepReview } from './SellStepReview';
-import { ChevronLeft, ChevronRight, CheckCircle2, Loader2, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle2, Loader2, ShieldCheck, AlertCircle } from 'lucide-react';
 
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 
 export function SellForm() {
   const { user, isVerifiedSeller, loading: authLoading } = useAuth();
@@ -23,6 +24,7 @@ export function SellForm() {
   const [step, setStep] = React.useState(1);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
   const [formData, setFormData] = React.useState({
     gameId: '',
     sectionId: '' as SectionId | '',
@@ -126,12 +128,36 @@ export function SellForm() {
   const prevStep = () => setStep(prev => Math.max(prev - 1, 1));
 
   const handleSubmit = async () => {
-    if (!isStepValid()) return;
+    if (!isStepValid() || !user) return;
     setIsSubmitting(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setIsSubmitting(false);
-    setIsSuccess(true);
+    setError(null);
+    
+    try {
+      const { data, error: submitError } = await supabase
+        .from('listings')
+        .insert({
+          seller_id: user.id,
+          title: formData.title,
+          description: formData.description,
+          price: parseFloat(formData.price),
+          game: formData.gameId,
+          category: formData.categoryId,
+          images: formData.images.length > 0 ? formData.images : ['https://picsum.photos/seed/listing/800/600'],
+          metadata: isAccount ? formData.accountMetadata : {},
+          status: 'active'
+        })
+        .select()
+        .single();
+
+      if (submitError) throw submitError;
+      
+      setIsSuccess(true);
+    } catch (err: any) {
+      console.error('Error publishing listing:', err);
+      setError(err.message || 'Failed to publish listing. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const selectedGame = GAMES.find(g => g.id === formData.gameId);
@@ -215,35 +241,43 @@ export function SellForm() {
           </AnimatePresence>
         </div>
 
-        <div className="mt-16 pt-8 border-t border-zinc-800 flex items-center justify-between">
-          <Button
-            variant="ghost"
-            onClick={prevStep}
-            disabled={step === 1}
-            className="text-zinc-500 hover:text-white disabled:opacity-0"
-          >
-            <ChevronLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
-          
-          {step < totalSteps ? (
-            <Button
-              onClick={nextStep}
-              disabled={!isStepValid()}
-              className="bg-white hover:bg-zinc-200 text-black font-bold px-8 h-12"
-            >
-              Continue
-              <ChevronRight className="w-4 h-4 ml-2" />
-            </Button>
-          ) : (
-            <Button
-              onClick={handleSubmit}
-              disabled={isSubmitting || !isStepValid()}
-              className="bg-amber-500 hover:bg-amber-600 text-black font-bold px-12 h-12 shadow-[0_0_20px_rgba(245,158,11,0.3)]"
-            >
-              {isSubmitting ? 'Publishing...' : 'Publish Listing'}
-            </Button>
+        <div className="mt-16 pt-8 border-t border-zinc-800 flex flex-col space-y-4">
+          {error && (
+            <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-500 text-sm font-bold uppercase tracking-widest">
+              <AlertCircle className="w-5 h-5" />
+              {error}
+            </div>
           )}
+          <div className="flex items-center justify-between">
+            <Button
+              variant="ghost"
+              onClick={prevStep}
+              disabled={step === 1}
+              className="text-zinc-500 hover:text-white disabled:opacity-0"
+            >
+              <ChevronLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
+            
+            {step < totalSteps ? (
+              <Button
+                onClick={nextStep}
+                disabled={!isStepValid()}
+                className="bg-white hover:bg-zinc-200 text-black font-bold px-8 h-12"
+              >
+                Continue
+                <ChevronRight className="w-4 h-4 ml-2" />
+              </Button>
+            ) : (
+              <Button
+                onClick={handleSubmit}
+                disabled={isSubmitting || !isStepValid()}
+                className="bg-amber-500 hover:bg-amber-600 text-black font-bold px-12 h-12 shadow-[0_0_20px_rgba(245,158,11,0.3)]"
+              >
+                {isSubmitting ? 'Publishing...' : 'Publish Listing'}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 

@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { AuthProvider } from '@/components/auth/AuthProvider';
+import { PayPalProvider } from '@/components/providers/PayPalProvider';
 
 export const metadata: Metadata = {
   title: 'RSPlatform | Premium OSRS Marketplace',
@@ -19,13 +20,15 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className="font-sans bg-zinc-950 text-zinc-100 antialiased">
         <AuthProvider>
-          <div className="relative flex min-h-screen flex-col">
-            <Suspense fallback={<div className="h-20 bg-zinc-950/50 backdrop-blur-xl border-b border-white/5" />}>
-              <Navbar />
-            </Suspense>
-            <main className="flex-1">{children}</main>
-            <Footer />
-          </div>
+          <PayPalProvider>
+            <div className="relative flex min-h-screen flex-col">
+              <Suspense fallback={<div className="h-20 bg-zinc-950/50 backdrop-blur-xl border-b border-white/5" />}>
+                <Navbar />
+              </Suspense>
+              <main className="flex-1">{children}</main>
+              <Footer />
+            </div>
+          </PayPalProvider>
         </AuthProvider>
       </body>
     </html>

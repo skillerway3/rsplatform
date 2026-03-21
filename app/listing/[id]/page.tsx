@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { LISTINGS, USERS } from '@/data/mock';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -22,20 +21,82 @@ import {
   Trophy,
   UserCheck,
   ArrowRight,
-  Info
+  Info,
+  Loader2
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
+import { supabase } from '@/lib/supabase';
 
 export default function ListingDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const router = useRouter();
-  const listing = LISTINGS.find(l => l.id === id);
-  const seller = listing ? USERS.find(u => u.id === listing.sellerId) : null;
+  
+  const [listing, setListing] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
-  if (!listing || !seller) {
+  React.useEffect(() => {
+    const fetchListing = async () => {
+      setLoading(true);
+      try {
+        const { data, error: fetchError } = await supabase
+          .from('listings')
+          .select(`
+            *,
+            seller:profiles!listings_seller_id_fkey (
+              username,
+              avatar_url,
+              is_verified_seller,
+              average_rating,
+              review_count
+            )
+          `)
+          .eq('id', id)
+          .single();
+
+        if (fetchError) throw fetchError;
+        
+        const transformedListing = {
+          ...data,
+          gameId: data.game,
+          categoryId: data.category,
+          deliveryTime: 'Instant Delivery',
+          deliveryMethod: 'In-game Trade',
+          seller: {
+            id: data.seller_id,
+            username: data.seller?.username || 'Unknown',
+            avatar: data.seller?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.seller_id}`,
+            isVerified: data.seller?.is_verified_seller || false,
+            rating: data.seller?.average_rating || 0,
+            totalSales: data.seller?.review_count || 0,
+          }
+        };
+
+        setListing(transformedListing);
+      } catch (err: any) {
+        console.error('Error fetching listing:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) fetchListing();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center space-y-4">
+        <Loader2 className="w-12 h-12 text-amber-500 animate-spin" />
+        <p className="text-zinc-500 font-black uppercase tracking-widest text-xs">Accessing Dossier...</p>
+      </div>
+    );
+  }
+
+  if (error || !listing) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
         <div className="text-center">
@@ -48,8 +109,9 @@ export default function ListingDetailPage() {
     );
   }
 
+  const seller = listing.seller;
   const isAccount = listing.categoryId === 'accounts';
-  const metadata = listing.accountMetadata;
+  const metadata = listing.metadata;
 
   return (
     <div className="pt-32 pb-32 bg-zinc-950 min-h-screen relative overflow-hidden">
@@ -101,7 +163,7 @@ export default function ListingDetailPage() {
               </div>
               {listing.images.length > 1 && (
                 <div className="grid grid-cols-4 gap-6">
-                  {listing.images.slice(1).map((img, i) => (
+                  {listing.images.slice(1).map((img: string, i: number) => (
                     <div key={i} className="aspect-video relative rounded-2xl overflow-hidden border border-white/5 bg-zinc-900/50 cursor-pointer hover:border-amber-500/50 transition-all hover:scale-[1.02] active:scale-95 shadow-lg">
                       <Image src={img} alt="" fill className="object-cover" referrerPolicy="no-referrer" />
                     </div>
@@ -147,7 +209,7 @@ export default function ListingDetailPage() {
                     { label: 'Account Type', value: metadata.type, icon: Zap },
                     { label: 'Total Level', value: metadata.totalLevel, icon: Star },
                     { label: 'Login Method', value: metadata.loginMethod, icon: Lock },
-                  ].map((spec, i) => (
+                  ].map((spec: any, i: number) => (
                     <div key={i} className="bg-zinc-950/50 border border-zinc-900 rounded-3xl p-6 space-y-4 hover:border-zinc-800 transition-colors group">
                       <div className="w-10 h-10 rounded-2xl bg-zinc-900 flex items-center justify-center group-hover:bg-amber-500/10 transition-colors">
                         <spec.icon className="w-5 h-5 text-zinc-600 group-hover:text-amber-500 transition-colors" />
@@ -167,7 +229,7 @@ export default function ListingDetailPage() {
                       Account Highlights
                     </h3>
                     <div className="grid grid-cols-1 gap-y-4">
-                      {metadata?.highlights?.map((highlight, i) => (
+                      {metadata?.highlights?.map((highlight: string, i: number) => (
                         <div key={i} className="flex items-center text-zinc-300 font-bold group">
                           <div className="w-6 h-6 rounded-full bg-emerald-500/10 flex items-center justify-center mr-4 group-hover:bg-emerald-500/20 transition-colors">
                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />

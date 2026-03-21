@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense, useCallback } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { BoostingTabs } from './BoostingTabs';
 import { ServiceFormLayout } from './ServiceFormLayout';
@@ -63,19 +63,9 @@ function BoostingContent() {
     setOptions(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleUpdateOrder = useCallback((summary: { service: string; details: string[] }) => {
-    setOrderSummary((prev) => {
-      const sameService = prev.service === summary.service;
-      const sameLength = prev.details.length === summary.details.length;
-      const sameDetails = sameLength && prev.details.every((detail, index) => detail === summary.details[index]);
-
-      if (sameService && sameDetails) {
-        return prev;
-      }
-
-      return summary;
-    });
-  }, []);
+  const handleUpdateOrder = (summary: { service: string; details: string[] }) => {
+    setOrderSummary(summary);
+  };
 
   const isOSRS = !gameParam || gameParam.toUpperCase() === 'OSRS';
 
@@ -136,32 +126,19 @@ function BoostingContent() {
   };
 
   const getServiceInfo = () => {
-    switch (activeTab) {
-      case 'power-leveling': return { title: 'Power Leveling', description: 'Professional skill training tailored to your goals. Fast, efficient, and secure.' };
-      case 'questing': return { title: 'Questing Services', description: 'Complete any quest or quest line. From novice to grandmaster, we handle it all.' };
-      case 'fire-cape': return { title: 'Fire Cape & Jad', description: 'Guaranteed Fire Cape completion. Our experts handle the waves so you don\'t have to.' };
-      case 'minigames': return { title: 'Minigames & Rewards', description: 'Unlock powerful gear and rewards from OSRS\'s most challenging minigames.' };
-      case 'pvm': return { title: 'PvM & Bossing', description: 'Expert boss killing and monster hunting for rare drops and pets.' };
-      case 'quiver': return { title: 'Fortis Colosseum', description: 'Master the Colosseum and earn your Dizana\'s Quiver with our expert help.' };
-      case 'ironman-gathering': return { title: 'Ironman Gathering', description: 'Specialized resource gathering for Ironman accounts. We do the grind for you.' };
-      case 'combat-achievements': return { title: 'Combat Achievements', description: 'Complete challenging combat tasks and unlock prestigious rewards.' };
-      case 'blood-torva': return { title: 'Blood Torva', description: 'Unlock the ultimate cosmetic upgrade for your Torva armor.' };
-      case 'yama-contracts': return { title: 'Yama Contracts', description: 'Professional completion of Yama contracts for exclusive rewards.' };
-      case 'raids': return { title: 'Raids & CoX/ToB/ToA', description: 'Expert raid completion and teaching. High-tier loot awaits.' };
-      case 'achievement-diaries': return { title: 'Achievement Diaries', description: 'Complete any diary tier in any region for powerful utility rewards.' };
-      case 'custom-request': return { title: 'Custom Request', description: 'Need something unique? Describe your request and we\'ll make it happen.' };
-      default: return { title: 'Boosting Services', description: 'Professional OSRS services tailored to your needs.' };
-    }
+    const service = BOOSTING_SERVICES.find(s => s.id === activeTab);
+    return service || { title: 'Boosting Services', description: 'Professional OSRS services tailored to your needs.' };
   };
 
   const serviceInfo = getServiceInfo();
+  const title = 'label' in serviceInfo ? serviceInfo.label : serviceInfo.title;
 
   return (
     <div className="space-y-16">
       <BoostingTabs activeTab={activeTab} onTabChange={handleTabChange} />
       
       <ServiceFormLayout 
-        title={serviceInfo.title}
+        title={title}
         description={serviceInfo.description}
         options={options}
         onOptionChange={handleOptionChange}

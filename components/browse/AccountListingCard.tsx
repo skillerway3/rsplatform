@@ -15,8 +15,8 @@ interface AccountListingCardProps {
 }
 
 export function AccountListingCard({ listing }: AccountListingCardProps) {
-  const seller = USERS.find(u => u.id === listing.sellerId);
-  const metadata = listing.accountMetadata;
+  const seller = listing.seller;
+  const metadata = listing.metadata;
 
   return (
     <Link href={`/listing/${listing.id}`}>
@@ -89,7 +89,7 @@ export function AccountListingCard({ listing }: AccountListingCardProps) {
               {/* Highlights with Icons */}
               {metadata?.highlights && metadata.highlights.length > 0 && (
                 <div className="flex flex-wrap gap-3">
-                  {metadata.highlights.slice(0, 3).map((highlight, idx) => (
+                  {metadata.highlights.slice(0, 3).map((highlight: string, idx: number) => (
                     <div key={idx} className="flex items-center gap-2 bg-zinc-900/50 border border-zinc-800/50 px-3 py-1.5 rounded-lg">
                       <CheckCircle2 className="w-3 h-3 text-amber-500" />
                       <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">{highlight}</span>

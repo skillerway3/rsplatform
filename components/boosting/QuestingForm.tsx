@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Search, Check, X, Info, Upload, FileText } from 'lucide-react';
 import { OSRS_QUESTS } from '@/data/boosting/osrs-quests';
@@ -17,10 +17,10 @@ export function QuestingForm({ onUpdate }: QuestingFormProps) {
   const [additionalInfo, setAdditionalInfo] = useState('');
   const [files, setFiles] = useState<File[]>([]);
 
-  const orderSummary = useMemo(() => {
-    const selectedQuestNames = OSRS_QUESTS.flatMap((g) => g.quests)
-      .filter((q) => selectedQuests.includes(q.id))
-      .map((q) => q.label);
+  useEffect(() => {
+    const selectedQuestNames = OSRS_QUESTS.flatMap(g => g.quests)
+      .filter(q => selectedQuests.includes(q.id))
+      .map(q => q.label);
 
     const details = [
       `Quests: ${selectedQuests.length} selected`,
@@ -28,19 +28,13 @@ export function QuestingForm({ onUpdate }: QuestingFormProps) {
       ...(selectedQuestNames.length > 3 ? [`+ ${selectedQuestNames.length - 3} more`] : []),
       `Account: ${accountType.replace('_', ' ')}`,
     ];
-
     if (additionalInfo) details.push(`Notes: ${additionalInfo.substring(0, 30)}...`);
-    if (files.length > 0) details.push(`Files: ${files.length} attached`);
 
-    return {
+    onUpdate({
       service: 'Questing',
       details,
-    };
-  }, [selectedQuests, accountType, additionalInfo, files]);
-
-  useEffect(() => {
-    onUpdate(orderSummary);
-  }, [orderSummary, onUpdate]);
+    });
+  }, [selectedQuests, accountType, additionalInfo, files, onUpdate]);
 
   const toggleQuest = (id: string) => {
     setSelectedQuests(prev =>

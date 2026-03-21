@@ -12,9 +12,17 @@ import { Loader2 } from 'lucide-react';
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
-  const [stats, setStats] = useState({ listingCount: 0, orderCount: 0, requestCount: 0 });
+  const [stats, setStats] = useState({ 
+    listingCount: 0, 
+    orderCount: 0, 
+    requestCount: 0, 
+    totalRevenue: 0,
+    pendingOrders: 0,
+    unreadMessages: 0
+  });
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [userListings, setUserListings] = useState<any[]>([]);
+  const [revenueData, setRevenueData] = useState<{ name: string; value: number }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -31,11 +39,43 @@ export default function DashboardPage() {
         // Fetch user's orders (as buyer)
         const { data: orders } = await supabase
           .from('orders')
-          .select('*')
+          .select('*, listings(*)')
           .eq('buyer_id', user.id)
           .order('created_at', { ascending: false })
-          .limit(5);
+          .limit(10);
 
+        // Fetch user's sales (as seller) for revenue and pending count
+        const { data: sales } = await supabase
+          .from('orders')
+          .select('*, listings(*)')
+          .eq('seller_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        const completedSales = sales?.filter(s => s.status === 'completed') || [];
+        const pendingSales = sales?.filter(s => s.status === 'pending' || s.status === 'processing').length || 0;
+
+        // Merge and sort activities
+        const allActivities = [
+          ...(orders || []).map((order: any) => ({
+            id: order.id,
+            createdAt: order.created_at,
+            type: 'purchase' as const,
+            amount: order.total_price,
+            title: order.listings?.title || 'Purchase'
+          })),
+          ...(sales || []).map((sale: any) => ({
+            id: sale.id,
+            createdAt: sale.created_at,
+            type: 'sale' as const,
+            amount: sale.total_price,
+            title: sale.listings?.title || 'Sale'
+          }))
+        ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 5);
+
+        setRecentOrders(allActivities);
+        
         // Fetch user's requests
         const { data: requests } = await supabase
           .from('buyer_requests')
@@ -43,11 +83,38 @@ export default function DashboardPage() {
           .eq('buyer_id', user.id);
 
         setUserListings(listings || []);
-        setRecentOrders(orders || []);
+        
+        const totalRev = completedSales.reduce((acc, sale) => acc + (sale.total_price || 0), 0) || 0;
+        
+        // Process revenue data for the last 7 days
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const last7Days = Array.from({ length: 7 }, (_, i) => {
+          const d = new Date();
+          d.setDate(d.getDate() - (6 - i));
+          return {
+            name: days[d.getDay()],
+            date: d.toISOString().split('T')[0],
+            value: 0
+          };
+        });
+
+        completedSales.forEach(sale => {
+          const saleDate = new Date(sale.created_at).toISOString().split('T')[0];
+          const dayIndex = last7Days.findIndex(d => d.date === saleDate);
+          if (dayIndex !== -1) {
+            last7Days[dayIndex].value += sale.total_price || 0;
+          }
+        });
+
+        setRevenueData(last7Days.map(({ name, value }) => ({ name, value })));
+
         setStats({
           listingCount: listings?.length || 0,
           orderCount: orders?.length || 0,
-          requestCount: requests?.length || 0
+          requestCount: requests?.length || 0,
+          totalRevenue: totalRev,
+          pendingOrders: pendingSales,
+          unreadMessages: 0 // Feature not fully implemented yet
         });
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
@@ -93,10 +160,13 @@ export default function DashboardPage() {
           <DashboardStats 
             listingCount={stats.listingCount} 
             orderCount={stats.orderCount} 
+            totalRevenue={stats.totalRevenue}
+            pendingOrders={stats.pendingOrders}
+            unreadMessages={stats.unreadMessages}
           />
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <DashboardRevenueChart />
+            <DashboardRevenueChart data={revenueData} />
             <DashboardRecentActivity activities={recentOrders} />
           </div>
 

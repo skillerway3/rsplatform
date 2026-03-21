@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Plus, Trash2, ChevronDown, Info, Upload, FileText } from 'lucide-react';
 import { OSRS_SKILLS } from '@/data/boosting/osrs-skills';
@@ -31,7 +31,7 @@ export function PowerLevelingForm({ onUpdate }: PowerLevelingFormProps) {
     if (field === 'currentLevel' || field === 'desiredLevel') {
       finalValue = Math.max(1, Math.min(99, value || 1));
     }
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: finalValue } : r)));
+    setRows(rows.map(r => (r.id === id ? { ...r, [field]: finalValue } : r)));
   };
 
   const getRowError = (row: SkillRow) => {
@@ -41,34 +41,28 @@ export function PowerLevelingForm({ onUpdate }: PowerLevelingFormProps) {
     return null;
   };
 
-  const orderSummary = useMemo(() => {
-    const details = rows.map((row) => {
-      const skill = OSRS_SKILLS.find((s) => s.id === row.skillId);
+  useEffect(() => {
+    const details = rows.map(row => {
+      const skill = OSRS_SKILLS.find(s => s.id === row.skillId);
       const error = getRowError(row);
       return `${skill?.label}: ${row.currentLevel} → ${row.desiredLevel}${error ? ' (Invalid Range)' : ''}`;
     });
-
     details.push(`Account: ${accountType.replace('_', ' ')}`);
     if (additionalInfo) details.push(`Notes: ${additionalInfo.substring(0, 30)}...`);
-    if (files.length > 0) details.push(`Files: ${files.length} attached`);
 
-    return {
+    onUpdate({
       service: 'Power Leveling',
       details,
-    };
-  }, [rows, accountType, additionalInfo, files]);
-
-  useEffect(() => {
-    onUpdate(orderSummary);
-  }, [orderSummary, onUpdate]);
+    });
+  }, [rows, accountType, additionalInfo, files, onUpdate]);
 
   const addRow = () => {
-    setRows((prev) => [...prev, { id: Math.random().toString(), skillId: 'strength', currentLevel: 1, desiredLevel: 99 }]);
+    setRows([...rows, { id: Math.random().toString(), skillId: 'strength', currentLevel: 1, desiredLevel: 99 }]);
   };
 
   const removeRow = (id: string) => {
     if (rows.length > 1) {
-      setRows((prev) => prev.filter((r) => r.id !== id));
+      setRows(rows.filter(r => r.id !== id));
     }
   };
 

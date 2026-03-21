@@ -23,7 +23,11 @@ const REVENUE_DATA = [
   { name: 'Sun', value: 1200 },
 ];
 
-export function DashboardRevenueChart() {
+interface DashboardRevenueChartProps {
+  data?: { name: string; value: number }[];
+}
+
+export function DashboardRevenueChart({ data = REVENUE_DATA }: DashboardRevenueChartProps) {
   return (
     <Card className="premium-card lg:col-span-2 p-10 space-y-10">
       <div className="flex items-center justify-between">
@@ -38,7 +42,7 @@ export function DashboardRevenueChart() {
 
       <div className="h-[300px] w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={REVENUE_DATA}>
+          <AreaChart data={data}>
             <defs>
               <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3}/>

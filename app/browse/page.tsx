@@ -4,13 +4,13 @@ import * as React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { Search, Filter, SlidersHorizontal, Zap, Star, ChevronDown, LayoutGrid, List, X } from 'lucide-react';
+import { Search, Filter, SlidersHorizontal, Zap, Star, ChevronDown, LayoutGrid, List, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { motion, AnimatePresence } from 'motion/react';
-import { LISTINGS, GAMES, CATEGORIES } from '@/data/mock';
+import { GAMES, CATEGORIES } from '@/data/mock';
 import { formatCurrency, cn, getListingSection } from '@/lib/utils';
 import { GameId, CategoryId, SectionId } from '@/types';
 import { SECTION_TO_CATEGORY, NAV_SECTIONS } from '@/data/navigation';
@@ -18,6 +18,7 @@ import { AccountFilters } from '@/components/browse/AccountFilters';
 import { AccountListingCard } from '@/components/browse/AccountListingCard';
 import { BoostingSection } from '@/components/boosting/BoostingSection';
 import { ListingCard } from '@/components/ListingCard';
+import { supabase } from '@/lib/supabase';
 
 function BrowseContent() {
   const searchParams = useSearchParams();
@@ -27,6 +28,9 @@ function BrowseContent() {
   const gameParam = searchParams.get('game');
   const categoryParam = searchParams.get('category');
 
+  const [listings, setListings] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedGame, setSelectedGame] = React.useState<GameId | 'all'>('all');
   const [selectedCategory, setSelectedCategory] = React.useState<CategoryId | 'all'>('all');
@@ -83,6 +87,76 @@ function BrowseContent() {
     }
   }, [sectionParam, gameParam, categoryParam, searchParams, pathname, router]);
 
+  // Fetch real listings from Supabase
+  React.useEffect(() => {
+    const fetchListings = async () => {
+      setLoading(true);
+      try {
+        let query = supabase
+          .from('listings')
+          .select(`
+            *,
+            seller:profiles!listings_seller_id_fkey (
+              username,
+              avatar_url,
+              is_verified_seller,
+              average_rating,
+              review_count
+            )
+          `)
+          .eq('status', 'active');
+
+        if (selectedGame !== 'all') {
+          query = query.eq('game', selectedGame);
+        }
+
+        if (sectionParam) {
+          const categoryId = SECTION_TO_CATEGORY[sectionParam.toLowerCase()];
+          if (categoryId) {
+            query = query.eq('category', categoryId);
+          }
+        } else if (selectedCategory !== 'all') {
+          query = query.eq('category', selectedCategory);
+        }
+
+        if (searchQuery) {
+          query = query.ilike('title', `%${searchQuery}%`);
+        }
+
+        const { data, error: fetchError } = await query.order('created_at', { ascending: false });
+
+        if (fetchError) throw fetchError;
+        
+        // Transform data to match the expected Listing type if necessary
+        const transformedData = data?.map((item: any) => ({
+          ...item,
+          gameId: item.game,
+          categoryId: item.category,
+          sellerId: item.seller_id,
+          deliveryTime: 'Instant Delivery', // Default or from DB if added
+          deliveryMethod: 'In-game Trade', // Default or from DB if added
+          seller: {
+            id: item.seller_id,
+            username: item.seller?.username || 'Unknown',
+            avatar: item.seller?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.seller_id}`,
+            isVerified: item.seller?.is_verified_seller || false,
+            rating: item.seller?.average_rating || 0,
+            totalSales: item.seller?.review_count || 0,
+          }
+        }));
+
+        setListings(transformedData || []);
+      } catch (err: any) {
+        console.error('Error fetching listings:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchListings();
+  }, [selectedGame, selectedCategory, sectionParam, searchQuery]);
+
   const updateUrl = (params: Record<string, string | null>) => {
     const newParams = new URLSearchParams(searchParams.toString());
     Object.entries(params).forEach(([key, value]) => {
@@ -117,37 +191,6 @@ function BrowseContent() {
 
   const isAccountSection = selectedCategory === 'accounts' || sectionParam?.toLowerCase() === 'accounts';
   const isBoostingSection = selectedCategory === 'services' || sectionParam?.toLowerCase() === 'boosting';
-
-  const filteredListings = LISTINGS.filter((listing) => {
-    const matchesGame = selectedGame === 'all' || listing.gameId === selectedGame;
-    
-    // Strict Section Filtering
-    const listingSection = getListingSection(listing);
-    const matchesSection = !sectionParam || listingSection === sectionParam.toLowerCase();
-    
-    if (!matchesSection) return false;
-
-    // Category filtering (from sidebar, only if not in a specific section or if it matches the section)
-    const matchesCategory = selectedCategory === 'all' || listing.categoryId === selectedCategory;
-    
-    if (isAccountSection) {
-      const metadata = listing.accountMetadata;
-      const matchesSearch = !accountFilters.search || 
-        listing.title.toLowerCase().includes(accountFilters.search.toLowerCase()) ||
-        listing.description.toLowerCase().includes(accountFilters.search.toLowerCase());
-      const matchesMinPrice = !accountFilters.minPrice || listing.price >= parseFloat(accountFilters.minPrice);
-      const matchesMaxPrice = !accountFilters.maxPrice || listing.price <= parseFloat(accountFilters.maxPrice);
-      const matchesBuild = !accountFilters.build || metadata?.build === accountFilters.build;
-      const matchesType = !accountFilters.type || metadata?.type === accountFilters.type;
-      const matchesLogin = !accountFilters.loginMethod || metadata?.loginMethod === accountFilters.loginMethod;
-      const matchesLevel = !accountFilters.totalLevel || metadata?.totalLevel === accountFilters.totalLevel;
-
-      return matchesGame && matchesCategory && matchesSearch && matchesMinPrice && matchesMaxPrice && matchesBuild && matchesType && matchesLogin && matchesLevel;
-    }
-
-    const matchesSearch = listing.title.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch && matchesGame && matchesCategory;
-  });
 
   const clearAccountFilters = () => {
     setAccountFilters({
@@ -282,7 +325,7 @@ function BrowseContent() {
                       >
                         All Games
                       </button>
-                      {GAMES.map((game) => (
+                      {GAMES.map((game: any) => (
                         <button 
                           key={game.id}
                           onClick={() => handleGameSelect(game.id)}
@@ -309,7 +352,7 @@ function BrowseContent() {
                       >
                         All Categories
                       </button>
-                      {CATEGORIES.map((cat) => (
+                      {CATEGORIES.map((cat: any) => (
                         <button 
                           key={cat.id}
                           onClick={() => handleCategorySelect(cat.id)}
@@ -338,7 +381,12 @@ function BrowseContent() {
                     : "grid-cols-1"
               )}>
                 <AnimatePresence mode="popLayout">
-                  {filteredListings.map((listing, i) => (
+                  {loading ? (
+                    <div className="lg:col-span-full py-32 flex flex-col items-center justify-center space-y-4">
+                      <Loader2 className="w-12 h-12 text-amber-500 animate-spin" />
+                      <p className="text-zinc-500 font-black uppercase tracking-widest text-xs">Scanning Inventory...</p>
+                    </div>
+                  ) : listings.map((listing: any, i: number) => (
                     <motion.div
                       key={listing.id}
                       layout
@@ -408,7 +456,7 @@ function BrowseContent() {
                 </AnimatePresence>
               </div>
 
-              {filteredListings.length === 0 && (
+              {!loading && listings.length === 0 && (
                 <div className="py-32 text-center">
                   <div className="w-20 h-20 bg-zinc-900 border border-zinc-800 rounded-3xl flex items-center justify-center mx-auto mb-8">
                     <Search className="w-8 h-8 text-zinc-700" />
@@ -478,7 +526,7 @@ function BrowseContent() {
                       >
                         All Games
                       </button>
-                      {GAMES.map((game) => (
+                      {GAMES.map((game: any) => (
                         <button 
                           key={game.id}
                           onClick={() => handleGameSelect(game.id)}
@@ -505,7 +553,7 @@ function BrowseContent() {
                       >
                         All Categories
                       </button>
-                      {CATEGORIES.map((cat) => (
+                      {CATEGORIES.map((cat: any) => (
                         <button 
                           key={cat.id}
                           onClick={() => handleCategorySelect(cat.id)}

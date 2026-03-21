@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { ShieldCheck, Clock, Zap, MessageSquare, CheckCircle2, AlertCircle, Loader2, ArrowLeft, ExternalLink, ChevronRight, Truck, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { PayPalButtons, PayPalScriptProvider } from "@paypal/react-paypal-js";
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { ChatModal } from '@/components/marketplace/ChatModal';
@@ -60,6 +61,9 @@ export default function OrderPage() {
   const [rating, setRating] = useState(5);
   const [reviewText, setReviewText] = useState('');
 
+  const [orderType, setOrderType] = useState<'direct' | 'request' | null>(null);
+  const [listing, setListing] = useState<any>(null);
+
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
@@ -69,6 +73,74 @@ export default function OrderPage() {
 
     const fetchData = async () => {
       try {
+        // 1. Try to fetch as an order first
+        const { data: orderData, error: orderError } = await supabase
+          .from('orders')
+          .select('*, listings(*)')
+          .eq('id', id)
+          .maybeSingle();
+
+        if (orderData) {
+          setOrder(orderData);
+          
+          // If it's a direct listing purchase
+          if (orderData.listing_id) {
+            setOrderType('direct');
+            setListing(orderData.listings);
+          } 
+          // If it's a buyer request order
+          else if (orderData.request_id) {
+            setOrderType('request');
+            const { data: reqData } = await supabase
+              .from('buyer_requests')
+              .select('*')
+              .eq('id', orderData.request_id)
+              .single();
+            
+            if (reqData) setRequest(reqData);
+
+            const { data: offersData } = await supabase
+              .from('buyer_request_offers')
+              .select('*')
+              .eq('request_id', orderData.request_id);
+            
+            if (offersData) setOffers(offersData);
+          }
+
+          // Fetch proof if delivered or completed
+          if (orderData.status === 'delivered' || orderData.status === 'completed') {
+            const { data: proofData } = await supabase
+              .from('buyer_request_proofs')
+              .select('*')
+              .eq('order_id', orderData.id)
+              .maybeSingle();
+            
+            if (proofData) {
+              const filePath = proofData.file_url?.split('/').pop();
+              if (filePath) {
+                const { data: signedData } = await supabase.storage
+                  .from('verifications')
+                  .createSignedUrl(`proofs/${orderData.id}/${filePath}`, 3600);
+                
+                if (signedData) proofData.signed_url = signedData.signedUrl;
+              }
+              setProof(proofData);
+            }
+
+            if (orderData.status === 'completed') {
+              const { data: reviewData } = await supabase
+                .from('seller_reviews')
+                .select('*')
+                .eq('order_id', orderData.id)
+                .maybeSingle();
+              
+              setReview(reviewData);
+            }
+          }
+          return;
+        }
+
+        // 2. If not an order, try to fetch as a buyer request (pre-order state)
         const { data: reqData, error: reqError } = await supabase
           .from('buyer_requests')
           .select('*')
@@ -76,6 +148,7 @@ export default function OrderPage() {
           .single();
 
         if (reqError) throw reqError;
+        setOrderType('request');
         setRequest(reqData);
 
         const { data: offersData, error: offersError } = await supabase
@@ -87,7 +160,7 @@ export default function OrderPage() {
         if (offersError) throw offersError;
         
         if (offersData && offersData.length > 0) {
-          const sellerIds = Array.from(new Set(offersData.map(o => o.seller_id)));
+          const sellerIds = Array.from(new Set(offersData.map((o: any) => o.seller_id)));
           const { data: profilesData } = await supabase
             .from('profiles')
             .select('id, username, is_verified_seller, avatar_url, average_rating, review_count')
@@ -98,59 +171,21 @@ export default function OrderPage() {
             return acc;
           }, {} as Record<string, any>);
 
-          const mergedOffers = offersData.map(offer => ({
+          const mergedOffers = offersData.map((offer: any) => ({
             ...offer,
             profiles: profilesMap[offer.seller_id]
           }));
           setOffers(mergedOffers);
-        } else {
-          setOffers([]);
         }
 
-        // Fetch order if matched or in_progress
-        if (reqData.status === 'matched' || reqData.status === 'in_progress') {
+        if (reqData.status === 'matched' || reqData.status === 'in_progress' || reqData.status === 'delivered' || reqData.status === 'completed') {
           const { data: orderData } = await supabase
             .from('orders')
             .select('*')
             .eq('request_id', id)
             .maybeSingle();
           
-          setOrder(orderData);
-
-          // Fetch proof if delivered or completed
-          if (orderData?.status === 'delivered' || orderData?.status === 'completed') {
-            const { data: proofData } = await supabase
-              .from('buyer_request_proofs')
-              .select('*')
-              .eq('order_id', orderData.id)
-              .maybeSingle();
-            
-            if (proofData) {
-              // Get signed URL for the proof file
-              const filePath = proofData.file_url.split('/').pop();
-              if (filePath) {
-                const { data: signedData } = await supabase.storage
-                  .from('verifications')
-                  .createSignedUrl(`proofs/${orderData.id}/${filePath}`, 3600);
-                
-                if (signedData) {
-                  proofData.signed_url = signedData.signedUrl;
-                }
-              }
-              setProof(proofData);
-            }
-
-            // Fetch review if completed
-            if (orderData.status === 'completed') {
-              const { data: reviewData } = await supabase
-                .from('seller_reviews')
-                .select('*')
-                .eq('order_id', orderData.id)
-                .maybeSingle();
-              
-              setReview(reviewData);
-            }
-          }
+          if (orderData) setOrder(orderData);
         }
       } catch (err: any) {
         console.error('Error fetching data:', err);
@@ -253,21 +288,29 @@ export default function OrderPage() {
     }
   };
 
-  const handleAcceptOffer = async (offer: Offer) => {
+  const handleAcceptOffer = async (offer: Offer, paypalOrderId: string) => {
     try {
       setLoading(true);
       
-      const { data, error } = await supabase.rpc('accept_offer', {
-        p_request_id: id,
-        p_offer_id: offer.id
+      const response = await fetch('/api/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: id,
+          offerId: offer.id,
+          paypalOrderId: paypalOrderId
+        })
       });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to accept offer');
+      }
 
       window.location.reload();
     } catch (err: any) {
       console.error('Error accepting offer:', err);
-      setError('Failed to accept offer. Please try again.');
+      setError(err.message || 'Failed to accept offer. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -345,20 +388,20 @@ export default function OrderPage() {
     );
   }
 
-  if (error || !request) {
+  if (error || (!request && !order)) {
     return (
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6">
         <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
-        <h1 className="text-2xl font-black uppercase tracking-widest text-white mb-2">Request Not Found</h1>
-        <p className="text-zinc-500 mb-8">{error || "The request you're looking for doesn't exist or you don't have permission to view it."}</p>
+        <h1 className="text-2xl font-black uppercase tracking-widest text-white mb-2">Order Not Found</h1>
+        <p className="text-zinc-500 mb-8">{error || "The order or request you're looking for doesn't exist or you don't have permission to view it."}</p>
         <Button variant="gold" onClick={() => router.push('/dashboard')}>Back to Dashboard</Button>
       </div>
     );
   }
 
-  const isExpired = new Date(request.expires_at) < new Date();
-  const isOpen = request.status === 'open' && !isExpired;
-  const isBuyer = user?.id === request.buyer_id;
+  const isExpired = request ? new Date(request.expires_at) < new Date() : false;
+  const isOpen = request ? request.status === 'open' && !isExpired : false;
+  const isBuyer = user?.id === (request?.buyer_id || order?.buyer_id);
   const isSeller = order && user?.id === order.seller_id;
 
   return (
@@ -370,7 +413,7 @@ export default function OrderPage() {
         </Link>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-          {/* Left Column: Request Details */}
+          {/* Left Column: Order/Request Details */}
           <div className="lg:col-span-2 space-y-8">
             <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-10 backdrop-blur-xl relative overflow-hidden">
               <div className="absolute top-0 right-0 p-10">
@@ -378,23 +421,27 @@ export default function OrderPage() {
                   "px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border",
                   isOpen ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-zinc-800 text-zinc-500 border-zinc-700"
                 )}>
-                  {isOpen ? 'Active Request' : request.status.toUpperCase()}
+                  {orderType === 'direct' ? 'Direct Purchase' : (isOpen ? 'Active Request' : request?.status?.toUpperCase())}
                 </div>
               </div>
 
               <div className="flex flex-col gap-2 mb-8">
-                <h1 className="text-3xl font-black text-white uppercase tracking-tight">{request.title}</h1>
+                <h1 className="text-3xl font-black text-white uppercase tracking-tight">
+                  {orderType === 'direct' ? listing?.title : request?.title}
+                </h1>
                 <div className="flex items-center gap-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
-                  <span className="flex items-center gap-1.5"><Zap className="w-3 h-3" /> {request.game}</span>
+                  <span className="flex items-center gap-1.5"><Zap className="w-3 h-3" /> {orderType === 'direct' ? listing?.game : request?.game}</span>
                   <span className="w-1 h-1 rounded-full bg-zinc-800" />
-                  <span className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> {new Date(request.created_at).toLocaleDateString()}</span>
+                  <span className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> {new Date(orderType === 'direct' ? order?.created_at : (request?.created_at || Date.now())).toLocaleDateString()}</span>
                 </div>
               </div>
 
               <div className="space-y-6">
                 <div className="p-6 bg-zinc-950/50 rounded-2xl border border-white/5">
                   <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em] mb-4">Description</h3>
-                  <p className="text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap">{request.description}</p>
+                  <p className="text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap">
+                    {orderType === 'direct' ? listing?.description : request?.description}
+                  </p>
                 </div>
               </div>
             </div>
@@ -418,7 +465,7 @@ export default function OrderPage() {
                     <div className="flex items-center gap-4">
                       <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Rating</p>
                       <div className="flex gap-2">
-                        {[1, 2, 3, 4, 5].map((star) => (
+                        {[1, 2, 3, 4, 5].map((star: number) => (
                           <button
                             key={star}
                             type="button"
@@ -458,7 +505,7 @@ export default function OrderPage() {
                 ) : (
                   <div className="p-6 bg-zinc-950/50 rounded-2xl border border-white/5 space-y-4">
                     <div className="flex items-center gap-2">
-                      {[1, 2, 3, 4, 5].map((star) => (
+                      {[1, 2, 3, 4, 5].map((star: number) => (
                         <Zap 
                           key={star} 
                           className={cn("w-4 h-4", review.rating >= star ? "text-amber-500 fill-amber-500" : "text-zinc-800")} 
@@ -540,11 +587,11 @@ export default function OrderPage() {
               </div>
             )}
 
-            {/* Offers Section */}
+            {/* Offers/Purchase Details Section */}
             <div className="space-y-8">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-black text-white uppercase tracking-[0.2em]">
-                  {order ? 'Accepted Offer' : `Offers (${offers.length})`}
+                  {orderType === 'direct' ? 'Purchase Details' : (order ? 'Accepted Offer' : `Offers (${offers.length})`)}
                 </h2>
                 {isOpen && isBuyer && (
                   <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
@@ -553,95 +600,131 @@ export default function OrderPage() {
                 )}
               </div>
 
-              <div className="grid gap-4">
-                {offers.map((offer) => {
-                  const isAccepted = order?.seller_id === offer.seller_id;
-                  if (order && !isAccepted) return null; // Only show accepted offer if order exists
-
-                  return (
-                    <motion.div
-                      key={offer.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className={cn(
-                        "group bg-zinc-900/40 border rounded-[2rem] p-8 transition-all hover:bg-zinc-900/60",
-                        isAccepted ? "border-amber-500/30 bg-amber-500/[0.02]" : "border-zinc-800/50"
-                      )}
-                    >
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
-                        <div className="flex items-center gap-6">
-                          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-zinc-800 to-zinc-900 border border-zinc-700 flex items-center justify-center text-xl font-black text-zinc-400">
-                            {offer.profiles?.username?.[0].toUpperCase() || 'S'}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-3 mb-1">
-                              <h3 className="text-lg font-black text-white uppercase tracking-widest">
-                                {offer.profiles?.username || 'Anonymous Seller'}
-                              </h3>
-                              {offer.profiles?.is_verified_seller && (
-                                <div className="bg-emerald-500/10 text-emerald-500 p-1 rounded-lg">
-                                  <ShieldCheck className="w-3.5 h-3.5" />
-                                </div>
-                              )}
-                              {offer.profiles && offer.profiles.average_rating > 0 && (
-                                <div className="flex items-center gap-1 ml-2">
-                                  <Zap className="w-3 h-3 text-amber-500 fill-amber-500" />
-                                  <span className="text-[10px] font-black text-amber-500">{Number(offer.profiles.average_rating).toFixed(1)}</span>
-                                  <span className="text-[9px] font-bold text-zinc-600">({offer.profiles.review_count})</span>
-                                </div>
-                              )}
-                            </div>
-                            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">
-                              Delivery: {offer.delivery_time}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-8">
-                          <div className="text-right">
-                            <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-1">Offer Price</p>
-                            <p className="text-2xl font-black text-amber-500 tracking-tighter">${offer.price}</p>
-                          </div>
-                          {isOpen && isBuyer && (
-                            <Button 
-                              variant="gold" 
-                              className="h-12 px-8 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-amber-500/10"
-                              onClick={() => handleAcceptOffer(offer)}
-                              disabled={loading}
-                            >
-                              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Accept Offer'}
-                            </Button>
-                          )}
-                          {isAccepted && (
-                            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-2 flex items-center gap-2">
-                              <CheckCircle2 className="w-4 h-4 text-amber-500" />
-                              <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Accepted</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="mt-8 pt-8 border-t border-zinc-800/50">
-                        <p className="text-sm text-zinc-400 font-medium leading-relaxed">
-                          {offer.message}
-                        </p>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-
-                {offers.length === 0 && !order && (
-                  <div className="bg-zinc-900/40 border border-zinc-800/50 border-dashed rounded-[2.5rem] p-16 text-center">
-                    <div className="w-16 h-16 bg-zinc-800/50 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                      <Zap className="w-8 h-8 text-zinc-700" />
+              {orderType === 'direct' ? (
+                <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2rem] p-8 backdrop-blur-xl">
+                  <div className="flex items-center justify-between p-6 bg-zinc-950/50 rounded-2xl border border-white/5">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Amount Paid</p>
+                      <p className="text-2xl font-black text-amber-500">${order?.total_price?.toFixed(2)}</p>
                     </div>
-                    <h3 className="text-lg font-black text-white uppercase tracking-widest mb-2">No offers yet</h3>
-                    <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest">
-                      Sellers will start submitting offers soon.
-                    </p>
+                    <div className="text-right space-y-1">
+                      <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Delivery Method</p>
+                      <p className="text-sm font-bold text-white uppercase tracking-widest">{listing?.delivery_method || 'Standard'}</p>
+                    </div>
                   </div>
-                )}
-              </div>
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {offers.map((offer: Offer) => {
+                    const isAccepted = order?.seller_id === offer.seller_id;
+                    if (order && !isAccepted) return null; // Only show accepted offer if order exists
+
+                    return (
+                      <motion.div
+                        key={offer.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={cn(
+                          "group bg-zinc-900/40 border rounded-[2rem] p-8 transition-all hover:bg-zinc-900/60",
+                          isAccepted ? "border-amber-500/30 bg-amber-500/[0.02]" : "border-zinc-800/50"
+                        )}
+                      >
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
+                          <div className="flex items-center gap-6">
+                            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-zinc-800 to-zinc-900 border border-zinc-700 flex items-center justify-center text-xl font-black text-zinc-400">
+                              {offer.profiles?.username?.[0].toUpperCase() || 'S'}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-3 mb-1">
+                                <h3 className="text-lg font-black text-white uppercase tracking-widest">
+                                  {offer.profiles?.username || 'Anonymous Seller'}
+                                </h3>
+                                {offer.profiles?.is_verified_seller && (
+                                  <div className="bg-emerald-500/10 text-emerald-500 p-1 rounded-lg">
+                                    <ShieldCheck className="w-3.5 h-3.5" />
+                                  </div>
+                                )}
+                                {offer.profiles && offer.profiles.average_rating > 0 && (
+                                  <div className="flex items-center gap-1 ml-2">
+                                    <Zap className="w-3 h-3 text-amber-500 fill-amber-500" />
+                                    <span className="text-[10px] font-black text-amber-500">{Number(offer.profiles.average_rating).toFixed(1)}</span>
+                                    <span className="text-[9px] font-bold text-zinc-600">({offer.profiles.review_count})</span>
+                                  </div>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">
+                                Delivery: {offer.delivery_time}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-8">
+                            <div className="text-right">
+                              <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-1">Offer Price</p>
+                              <p className="text-2xl font-black text-amber-500 tracking-tighter">${offer.price}</p>
+                            </div>
+                            {isOpen && isBuyer && (
+                              <div className="w-64">
+                                <PayPalScriptProvider options={{ 
+                                  clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "test",
+                                  currency: "USD",
+                                  intent: "capture"
+                                }}>
+                                  <PayPalButtons 
+                                    style={{ layout: "vertical", color: "gold", shape: "rect", label: "pay", height: 44 }}
+                                    createOrder={(data: any, actions: any) => {
+                                      return actions.order.create({
+                                        purchase_units: [
+                                          {
+                                            amount: {
+                                              value: offer.price.toString(),
+                                              currency_code: "USD"
+                                            },
+                                            description: `Offer for: ${request?.title || 'Custom Request'}`
+                                          }
+                                        ]
+                                      });
+                                    }}
+                                    onApprove={async (data, actions) => {
+                                      if (actions.order) {
+                                        await handleAcceptOffer(offer, data.orderID);
+                                      }
+                                    }}
+                                  />
+                                </PayPalScriptProvider>
+                              </div>
+                            )}
+                            {isAccepted && (
+                              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-2 flex items-center gap-2">
+                                <CheckCircle2 className="w-4 h-4 text-amber-500" />
+                                <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Accepted</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="mt-8 pt-8 border-t border-zinc-800/50">
+                          <p className="text-sm text-zinc-400 font-medium leading-relaxed">
+                            {offer.message}
+                          </p>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+
+                  {offers.length === 0 && !order && (
+                    <div className="bg-zinc-900/40 border border-zinc-800/50 border-dashed rounded-[2.5rem] p-16 text-center">
+                      <div className="w-16 h-16 bg-zinc-800/50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                        <Zap className="w-8 h-8 text-zinc-700" />
+                      </div>
+                      <h3 className="text-lg font-black text-white uppercase tracking-widest mb-2">No offers yet</h3>
+                      <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest">
+                        Sellers will start submitting offers soon.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -702,22 +785,24 @@ export default function OrderPage() {
             )}
 
             <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-8 backdrop-blur-xl">
-              <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.4em] mb-8">Request Status</h3>
+              <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.4em] mb-8">
+                {orderType === 'direct' ? 'Order Status' : 'Request Status'}
+              </h3>
               
               <div className="space-y-6">
                 <div className="flex items-center gap-4">
                   <div className={cn(
                     "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border",
-                    isOpen ? "bg-amber-500/10 border-amber-500/20 text-amber-500" : "bg-zinc-800 border-zinc-700 text-zinc-500"
+                    (order || isOpen) ? "bg-amber-500/10 border-amber-500/20 text-amber-500" : "bg-zinc-800 border-zinc-700 text-zinc-500"
                   )}>
-                    {isOpen ? <Zap className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
+                    {(order || isOpen) ? <Zap className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
                   </div>
                   <div>
                     <p className="text-[11px] font-black text-white uppercase tracking-widest">
-                      {order ? `ORDER: ${order.status.toUpperCase()}` : (isOpen ? 'Open for Offers' : request.status.toUpperCase())}
+                      {order ? `ORDER: ${order.status.toUpperCase()}` : (isOpen ? 'Open for Offers' : request?.status.toUpperCase())}
                     </p>
                     <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">
-                      {isOpen ? `Expires in ${Math.max(0, Math.floor((new Date(request.expires_at).getTime() - Date.now()) / 3600000))} hours` : 'Request finalized'}
+                      {orderType === 'direct' ? 'Direct listing purchase' : (isOpen ? `Expires in ${Math.max(0, Math.floor((new Date(request?.expires_at || Date.now()).getTime() - Date.now()) / 3600000))} hours` : 'Request finalized')}
                     </p>
                   </div>
                 </div>
