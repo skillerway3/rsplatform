@@ -1,0 +1,15 @@
+export const BOOSTING_SERVICES = [
+  { id: 'power-leveling', label: 'Power Leveling' },
+  { id: 'questing', label: 'Questing' },
+  { id: 'fire-cape', label: 'Fire Cape' },
+  { id: 'minigames', label: 'Minigames' },
+  { id: 'pvm', label: 'PvM' },
+  { id: 'quiver', label: 'Quiver' },
+  { id: 'ironman-gathering', label: 'Ironman Gathering' },
+  { id: 'combat-achievements', label: 'Combat Achievements' },
+  { id: 'blood-torva', label: 'Blood Torva' },
+  { id: 'yama-contracts', label: 'Yama Contracts' },
+  { id: 'raids', label: 'Raids' },
+  { id: 'achievement-diaries', label: 'Achievement Diaries' },
+  { id: 'custom-request', label: 'Custom Request' },
+];
