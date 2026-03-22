@@ -713,6 +713,20 @@ function BrowseContent() {
   );
 }
 
+function BrowsePageFallback() {
+  return (
+    <div className="min-h-screen bg-[#09090b] text-white">
+      <div className="mx-auto flex max-w-7xl items-center justify-center px-4 py-24">
+        <div className="text-zinc-400">Loading marketplace...</div>
+      </div>
+    </div>
+  );
+}
+
 export default function BrowsePage() {
-  return <BrowseContent />;
+  return (
+    <React.Suspense fallback={<BrowsePageFallback />}>
+      <BrowseContent />
+    </React.Suspense>
+  );
 }
