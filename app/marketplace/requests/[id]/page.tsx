@@ -123,6 +123,7 @@ export default function SellerRequestPage() {
 
     setIsSubmitting(true);
     try {
+      console.log('Delivering service for order:', order.id);
       // 1. Upload proof file
       const fileExt = deliveryFile.name.split('.').pop();
       const fileName = `proof-${Math.random()}.${fileExt}`;
@@ -132,7 +133,10 @@ export default function SellerRequestPage() {
         .from('verifications')
         .upload(filePath, deliveryFile);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError);
+        throw uploadError;
+      }
 
       // 2. Create proof record (store the path, not public URL)
       const { error: proofError } = await supabase
@@ -144,7 +148,10 @@ export default function SellerRequestPage() {
           note: deliveryNote
         });
 
-      if (proofError) throw proofError;
+      if (proofError) {
+        console.error('Proof record creation error:', proofError);
+        throw proofError;
+      }
 
       // 3. Update order status
       const { error: orderError } = await supabase
@@ -152,13 +159,59 @@ export default function SellerRequestPage() {
         .update({ status: 'delivered', delivered_at: new Date().toISOString() })
         .eq('id', order.id);
 
-      if (orderError) throw orderError;
+      if (orderError) {
+        console.error('Order status update error:', orderError);
+        throw orderError;
+      }
 
-      alert('Service delivered successfully! Waiting for buyer approval.');
-      window.location.reload();
+      // 4. Update request status
+      if (request?.id) {
+        const { error: reqError } = await supabase
+          .from('buyer_requests')
+          .update({ status: 'delivered' })
+          .eq('id', request.id);
+        
+        if (reqError) console.error('Error updating request status:', reqError);
+      }
+
+      console.log('Service delivered successfully, refreshing data...');
+      // Instead of reload, we re-fetch the data
+      setLoading(true);
+      const { data: reqData } = await supabase
+        .from('buyer_requests')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (reqData) setRequest(reqData);
+
+      const { data: orderData } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('request_id', id)
+        .eq('seller_id', user.id)
+        .maybeSingle();
+      if (orderData) {
+        setOrder(orderData);
+        const { data: proofData } = await supabase
+          .from('buyer_request_proofs')
+          .select('*')
+          .eq('order_id', orderData.id)
+          .maybeSingle();
+        if (proofData) {
+          const filePath = proofData.file_url.split('/').pop();
+          if (filePath) {
+            const { data: signedData } = await supabase.storage
+              .from('verifications')
+              .createSignedUrl(`proofs/${orderData.id}/${filePath}`, 3600);
+            if (signedData) proofData.signed_url = signedData.signedUrl;
+          }
+          setProof(proofData);
+        }
+      }
+      setLoading(false);
     } catch (err: any) {
       console.error('Error delivering service:', err);
-      alert('Failed to deliver service. Please try again.');
+      setError('Failed to deliver service. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -169,13 +222,14 @@ export default function SellerRequestPage() {
     if (!user || !request) return;
 
     if (!isVerifiedSeller) {
-      alert('You must verify your identity to submit offers. Redirecting to verification page...');
+      console.log('User not verified, redirecting to verification page');
       router.push('/sell/verify');
       return;
     }
 
     setIsSubmitting(true);
     try {
+      console.log('Submitting offer for request:', request.id);
       const { error } = await supabase
         .from('buyer_request_offers')
         .insert({
@@ -187,13 +241,16 @@ export default function SellerRequestPage() {
           status: 'pending',
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error submitting offer:', error);
+        throw error;
+      }
 
+      console.log('Offer submitted successfully');
       setHasSubmittedOffer(true);
-      alert('Offer submitted successfully!');
     } catch (err: any) {
       console.error('Error submitting offer:', err);
-      alert('Failed to submit offer. Please try again.');
+      setError('Failed to submit offer. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

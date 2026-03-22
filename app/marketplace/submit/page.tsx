@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -12,6 +12,13 @@ import Link from 'next/link';
 export default function SubmitRequestPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.push('/login');
+    }
+  }, [user, authLoading, router]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -56,14 +63,27 @@ export default function SubmitRequestPage() {
         .select()
         .single();
 
-      if (submitError) throw submitError;
+      if (submitError) {
+        console.error('Submission error:', submitError);
+        throw submitError;
+      }
+
+      if (!data) {
+        throw new Error('No data returned from submission');
+      }
 
       setSuccess(true);
-      setTimeout(() => {
-        router.push(`/orders/${data.id}`);
-      }, 2000);
+      
+      // Redirect immediately to avoid "freeze" feeling
+      try {
+        router.replace(`/orders/${data.id}`);
+      } catch (routerErr) {
+        console.error('Redirection error:', routerErr);
+        // Fallback if router fails
+        window.location.href = `/orders/${data.id}`;
+      }
     } catch (err: any) {
-      console.error('Error submitting request:', err);
+      console.error('Submit request error:', err);
       setError(err.message || 'Failed to submit request. Please try again.');
     } finally {
       setIsSubmitting(false);

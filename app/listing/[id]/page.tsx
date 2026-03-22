@@ -25,9 +25,11 @@ import {
   Loader2
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
+
+import { PayPalButtons } from "@paypal/react-paypal-js";
 
 export default function ListingDetailPage() {
   const params = useParams();
@@ -37,6 +39,35 @@ export default function ListingDetailPage() {
   const [listing, setListing] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [showCheckout, setShowCheckout] = React.useState(false);
+  const [isProcessing, setIsProcessing] = React.useState(false);
+
+  const handlePurchase = async (paypalOrderId: string) => {
+    setIsProcessing(true);
+    try {
+      const response = await fetch('/api/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          listingId: id,
+          paypalOrderId: paypalOrderId
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create order');
+      }
+
+      const order = await response.json();
+      router.push(`/orders/${order.id}`);
+    } catch (err: any) {
+      console.error('Error creating order:', err);
+      alert(err.message || 'Failed to process purchase. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   React.useEffect(() => {
     const fetchListing = async () => {
@@ -44,27 +75,21 @@ export default function ListingDetailPage() {
       try {
         const { data, error: fetchError } = await supabase
           .from('listings')
-          .select('*')
+          .select(`
+            *,
+            seller:profiles!listings_seller_id_fkey (
+              username,
+              avatar_url,
+              is_verified_seller,
+              average_rating,
+              review_count
+            )
+          `)
           .eq('id', id)
           .single();
 
         if (fetchError) throw fetchError;
-
-        const { data: sellerProfile, error: profileError } = await supabase
-          .from('profiles')
-          .select(`
-            id,
-            username,
-            avatar_url,
-            is_verified_seller,
-            average_rating,
-            review_count
-          `)
-          .eq('id', data.seller_id)
-          .maybeSingle();
-
-        if (profileError) throw profileError;
-
+        
         const transformedListing = {
           ...data,
           gameId: data.game,
@@ -73,13 +98,11 @@ export default function ListingDetailPage() {
           deliveryMethod: 'In-game Trade',
           seller: {
             id: data.seller_id,
-            username: sellerProfile?.username || 'Unknown',
-            avatar:
-              sellerProfile?.avatar_url ||
-              `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.seller_id}`,
-            isVerified: sellerProfile?.is_verified_seller || false,
-            rating: sellerProfile?.average_rating || 0,
-            totalSales: sellerProfile?.review_count || 0,
+            username: data.seller?.username || 'Unknown',
+            avatar: data.seller?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.seller_id}`,
+            isVerified: data.seller?.is_verified_seller || false,
+            rating: data.seller?.average_rating || 0,
+            totalSales: data.seller?.review_count || 0,
           }
         };
 
@@ -315,13 +338,51 @@ export default function ListingDetailPage() {
                   </div>
 
                   <div className="space-y-4">
-                    <div className="group/btn relative">
-                      <div className="absolute -inset-1 bg-gradient-to-r from-amber-500 to-amber-600 rounded-2xl blur opacity-20 group-hover/btn:opacity-40 transition duration-500" />
-                      <Button className="relative w-full h-16 rounded-2xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-black uppercase tracking-[0.2em] text-sm transition-all duration-300">
-                        Purchase Account
-                        <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover/btn:translate-x-1" />
-                      </Button>
-                    </div>
+                    {!showCheckout ? (
+                      <div className="group/btn relative">
+                        <div className="absolute -inset-1 bg-gradient-to-r from-amber-500 to-amber-600 rounded-2xl blur opacity-20 group-hover/btn:opacity-40 transition duration-500" />
+                        <Button 
+                          onClick={() => setShowCheckout(true)}
+                          className="relative w-full h-16 rounded-2xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-black uppercase tracking-[0.2em] text-sm transition-all duration-300"
+                        >
+                          Purchase {isAccount ? 'Account' : 'Item'}
+                          <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover/btn:translate-x-1" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                          <PayPalButtons 
+                            style={{ layout: "vertical", color: "gold", shape: "rect", label: "pay", height: 56 }}
+                            disabled={isProcessing}
+                            createOrder={(data: any, actions: any) => {
+                              return actions.order.create({
+                                purchase_units: [
+                                  {
+                                    amount: {
+                                      value: listing.price.toString(),
+                                      currency_code: "USD"
+                                    },
+                                    description: `Purchase: ${listing.title}`
+                                  }
+                                ]
+                              });
+                            }}
+                            onApprove={async (data, actions) => {
+                              if (actions.order) {
+                                await handlePurchase(data.orderID);
+                              }
+                            }}
+                            onCancel={() => setShowCheckout(false)}
+                          />
+                        <Button 
+                          variant="ghost" 
+                          onClick={() => setShowCheckout(false)}
+                          className="w-full text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    )}
                     <Button variant="outline" className="w-full h-16 rounded-2xl border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800 text-zinc-100 font-black uppercase tracking-[0.2em] text-sm transition-all">
                       Add to Cart
                     </Button>

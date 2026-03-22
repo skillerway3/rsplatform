@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/Badge';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 
 const BUILDS = ['Pure', 'Ironman', 'Main', 'Infernal', 'Skiller', 'Max', 'Hardcore', 'Obby', 'Slayer', 'Quiver', 'Pet', '99'];
 const TYPES = ['Regular', 'Ironman', 'Hardcore', 'Group Ironman', 'Pure', 'Main', 'Skiller'];

@@ -44,38 +44,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
-    const bootstrapAuth = async () => {
-      try {
-        const { data, error } = await supabase.auth.getSession();
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) fetchProfile(session.user.id);
+      setLoading(false);
+    });
 
-        if (error) {
-          console.warn('Clearing stale auth session:', error.message);
-          await supabase.auth.signOut({ scope: 'local' });
-          setSession(null);
-          setUser(null);
-          setProfile(null);
-          return;
-        }
-
-        const currentSession = data.session;
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-        if (currentSession?.user) {
-          fetchProfile(currentSession.user.id);
-        }
-      } catch (err) {
-        console.warn('Unable to restore auth session, clearing local state.', err);
-        await supabase.auth.signOut({ scope: 'local' });
-        setSession(null);
-        setUser(null);
-        setProfile(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    bootstrapAuth();
-
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);

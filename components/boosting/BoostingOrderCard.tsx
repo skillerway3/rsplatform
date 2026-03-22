@@ -47,6 +47,7 @@ export function BoostingOrderCard({ options, onOptionChange, summary, className 
 
     setIsSubmitting(true);
     try {
+      console.log('Submitting boosting request...', { summary, options });
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 24); // Default 24h
 
@@ -64,11 +65,26 @@ export function BoostingOrderCard({ options, onOptionChange, summary, className 
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error submitting request:', error);
+        throw error;
+      }
 
-      router.push(`/orders/${data.id}`);
+      if (!data) {
+        throw new Error('No data returned from request creation');
+      }
+
+      console.log('Request submitted successfully, redirecting to:', `/orders/${data.id}`);
+      
+      try {
+        await router.replace(`/orders/${data.id}`);
+      } catch (redirectError) {
+        console.error('Router redirect failed, falling back to window.location:', redirectError);
+        window.location.href = `/orders/${data.id}`;
+      }
     } catch (error: any) {
       console.error('Error submitting request:', error);
+      // You might want to add a toast or error state here to inform the user
     } finally {
       setIsSubmitting(false);
     }

@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { ShieldCheck, Clock, Zap, MessageSquare, CheckCircle2, AlertCircle, Loader2, ArrowLeft, ExternalLink, ChevronRight, Truck, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { PayPalButtons, PayPalScriptProvider } from "@paypal/react-paypal-js";
+import { PayPalButtons } from "@paypal/react-paypal-js";
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { ChatModal } from '@/components/marketplace/ChatModal';
@@ -63,6 +63,143 @@ export default function OrderPage() {
 
   const [orderType, setOrderType] = useState<'direct' | 'request' | null>(null);
   const [listing, setListing] = useState<any>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    if (!id) return;
+
+    const mergeOffersWithProfiles = async (offersData: any[]) => {
+      if (!offersData || offersData.length === 0) return [];
+      const sellerIds = Array.from(new Set(offersData.map((o: any) => o.seller_id)));
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, username, is_verified_seller, avatar_url, average_rating, review_count')
+        .in('id', sellerIds);
+      
+      const profilesMap = (profilesData || []).reduce((acc, profile) => {
+        acc[profile.id] = profile;
+        return acc;
+      }, {} as Record<string, any>);
+
+      return offersData.map((offer: any) => ({
+        ...offer,
+        profiles: profilesMap[offer.seller_id]
+      }));
+    };
+
+    try {
+      setLoading(true);
+      setError(null);
+      // 1. Try to fetch as an order first
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .select('*, listings(*)')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (orderData) {
+        setOrder(orderData);
+        
+        // If it's a direct listing purchase
+        if (orderData.listing_id) {
+          setOrderType('direct');
+          setListing(orderData.listings);
+        } 
+        // If it's a buyer request order
+        else if (orderData.request_id) {
+          setOrderType('request');
+          const { data: reqData } = await supabase
+            .from('buyer_requests')
+            .select('*')
+            .eq('id', orderData.request_id)
+            .single();
+          
+          if (reqData) setRequest(reqData);
+
+          const { data: offersData } = await supabase
+            .from('buyer_request_offers')
+            .select('*')
+            .eq('request_id', orderData.request_id);
+          
+          if (offersData) {
+            const merged = await mergeOffersWithProfiles(offersData);
+            setOffers(merged);
+          }
+        }
+
+        // Fetch proof if delivered or completed
+        if (orderData.status === 'delivered' || orderData.status === 'completed') {
+          const { data: proofData } = await supabase
+            .from('buyer_request_proofs')
+            .select('*')
+            .eq('order_id', orderData.id)
+            .maybeSingle();
+          
+          if (proofData) {
+            const filePath = proofData.file_url?.split('/').pop();
+            if (filePath) {
+              const { data: signedData } = await supabase.storage
+                .from('verifications')
+                .createSignedUrl(`proofs/${orderData.id}/${filePath}`, 3600);
+              
+              if (signedData) proofData.signed_url = signedData.signedUrl;
+            }
+            setProof(proofData);
+          }
+
+          if (orderData.status === 'completed') {
+            const { data: reviewData } = await supabase
+              .from('seller_reviews')
+              .select('*')
+              .eq('order_id', orderData.id)
+              .maybeSingle();
+            
+            setReview(reviewData);
+          }
+        }
+        return;
+      }
+
+      // 2. If not an order, try to fetch as a buyer request (pre-order state)
+      const { data: reqData, error: reqError } = await supabase
+        .from('buyer_requests')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (reqError) throw reqError;
+      setOrderType('request');
+      setRequest(reqData);
+
+      const { data: offersData, error: offersError } = await supabase
+        .from('buyer_request_offers')
+        .select('*')
+        .eq('request_id', id)
+        .order('created_at', { ascending: false });
+
+      if (offersError) throw offersError;
+      
+      if (offersData) {
+        const merged = await mergeOffersWithProfiles(offersData);
+        setOffers(merged);
+      }
+
+      if (reqData.status === 'matched' || reqData.status === 'in_progress' || reqData.status === 'delivered' || reqData.status === 'completed') {
+        const { data: orderData } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('request_id', id)
+          .maybeSingle();
+        
+        if (orderData) setOrder(orderData);
+      }
+    } catch (err: any) {
+      console.error('Error fetching data:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -71,130 +208,7 @@ export default function OrderPage() {
       return;
     }
 
-    const fetchData = async () => {
-      try {
-        // 1. Try to fetch as an order first
-        const { data: orderData, error: orderError } = await supabase
-          .from('orders')
-          .select('*, listings(*)')
-          .eq('id', id)
-          .maybeSingle();
-
-        if (orderData) {
-          setOrder(orderData);
-          
-          // If it's a direct listing purchase
-          if (orderData.listing_id) {
-            setOrderType('direct');
-            setListing(orderData.listings);
-          } 
-          // If it's a buyer request order
-          else if (orderData.request_id) {
-            setOrderType('request');
-            const { data: reqData } = await supabase
-              .from('buyer_requests')
-              .select('*')
-              .eq('id', orderData.request_id)
-              .single();
-            
-            if (reqData) setRequest(reqData);
-
-            const { data: offersData } = await supabase
-              .from('buyer_request_offers')
-              .select('*')
-              .eq('request_id', orderData.request_id);
-            
-            if (offersData) setOffers(offersData);
-          }
-
-          // Fetch proof if delivered or completed
-          if (orderData.status === 'delivered' || orderData.status === 'completed') {
-            const { data: proofData } = await supabase
-              .from('buyer_request_proofs')
-              .select('*')
-              .eq('order_id', orderData.id)
-              .maybeSingle();
-            
-            if (proofData) {
-              const filePath = proofData.file_url?.split('/').pop();
-              if (filePath) {
-                const { data: signedData } = await supabase.storage
-                  .from('verifications')
-                  .createSignedUrl(`proofs/${orderData.id}/${filePath}`, 3600);
-                
-                if (signedData) proofData.signed_url = signedData.signedUrl;
-              }
-              setProof(proofData);
-            }
-
-            if (orderData.status === 'completed') {
-              const { data: reviewData } = await supabase
-                .from('seller_reviews')
-                .select('*')
-                .eq('order_id', orderData.id)
-                .maybeSingle();
-              
-              setReview(reviewData);
-            }
-          }
-          return;
-        }
-
-        // 2. If not an order, try to fetch as a buyer request (pre-order state)
-        const { data: reqData, error: reqError } = await supabase
-          .from('buyer_requests')
-          .select('*')
-          .eq('id', id)
-          .single();
-
-        if (reqError) throw reqError;
-        setOrderType('request');
-        setRequest(reqData);
-
-        const { data: offersData, error: offersError } = await supabase
-          .from('buyer_request_offers')
-          .select('*')
-          .eq('request_id', id)
-          .order('created_at', { ascending: false });
-
-        if (offersError) throw offersError;
-        
-        if (offersData && offersData.length > 0) {
-          const sellerIds = Array.from(new Set(offersData.map((o: any) => o.seller_id)));
-          const { data: profilesData } = await supabase
-            .from('profiles')
-            .select('id, username, is_verified_seller, avatar_url, average_rating, review_count')
-            .in('id', sellerIds);
-          
-          const profilesMap = (profilesData || []).reduce((acc, profile) => {
-            acc[profile.id] = profile;
-            return acc;
-          }, {} as Record<string, any>);
-
-          const mergedOffers = offersData.map((offer: any) => ({
-            ...offer,
-            profiles: profilesMap[offer.seller_id]
-          }));
-          setOffers(mergedOffers);
-        }
-
-        if (reqData.status === 'matched' || reqData.status === 'in_progress' || reqData.status === 'delivered' || reqData.status === 'completed') {
-          const { data: orderData } = await supabase
-            .from('orders')
-            .select('*')
-            .eq('request_id', id)
-            .maybeSingle();
-          
-          if (orderData) setOrder(orderData);
-        }
-      } catch (err: any) {
-        console.error('Error fetching data:', err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
+    setIsAuthReady(true);
     fetchData();
 
     // Subscribe to new offers
@@ -221,13 +235,14 @@ export default function OrderPage() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [id, user, authLoading, router]);
+  }, [id, user, authLoading, router, fetchData]);
 
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!order || !user) return;
 
     setSubmittingReview(true);
+    setError(null);
     try {
       const { data, error } = await supabase
         .from('seller_reviews')
@@ -254,13 +269,27 @@ export default function OrderPage() {
   const handleApprove = async () => {
     try {
       setLoading(true);
-      const { error } = await supabase
+      setError(null);
+      
+      // 1. Update order status
+      const { error: orderError } = await supabase
         .from('orders')
         .update({ status: 'completed', resolved_at: new Date().toISOString() })
         .eq('id', order.id);
 
-      if (error) throw error;
-      window.location.reload();
+      if (orderError) throw orderError;
+
+      // 2. Update request status if it's a request-based order
+      if (order.request_id) {
+        const { error: reqError } = await supabase
+          .from('buyer_requests')
+          .update({ status: 'completed' })
+          .eq('id', order.request_id);
+        
+        if (reqError) console.error('Error updating request status:', reqError);
+      }
+
+      await fetchData();
     } catch (err: any) {
       console.error('Error approving order:', err);
       setError('Failed to approve order.');
@@ -272,6 +301,7 @@ export default function OrderPage() {
   const handleDispute = async () => {
     try {
       setLoading(true);
+      setError(null);
       const { error } = await supabase
         .from('orders')
         .update({ status: 'disputed' })
@@ -279,7 +309,7 @@ export default function OrderPage() {
 
       if (error) throw error;
 
-      window.location.reload();
+      await fetchData();
     } catch (err: any) {
       console.error('Error opening dispute:', err);
       setError('Failed to open dispute.');
@@ -291,6 +321,7 @@ export default function OrderPage() {
   const handleAcceptOffer = async (offer: Offer, paypalOrderId: string) => {
     try {
       setLoading(true);
+      setError(null);
       
       const response = await fetch('/api/create-order', {
         method: 'POST',
@@ -302,12 +333,18 @@ export default function OrderPage() {
         })
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to accept offer');
+        throw new Error(data.error || 'Failed to accept offer');
       }
 
-      window.location.reload();
+      if (data.order?.id) {
+        router.push(`/orders/${data.order.id}`);
+        return;
+      }
+
+      await fetchData();
     } catch (err: any) {
       console.error('Error accepting offer:', err);
       setError(err.message || 'Failed to accept offer. Please try again.');
@@ -321,6 +358,7 @@ export default function OrderPage() {
     if (!order || !deliveryFile) return;
 
     setDelivering(true);
+    setError(null);
     try {
       // 1. Upload proof file
       const fileExt = deliveryFile.name.split('.').pop();
@@ -351,7 +389,17 @@ export default function OrderPage() {
 
       if (orderError) throw orderError;
 
-      window.location.reload();
+      // 4. Update request status if it's a request-based order
+      if (order.request_id) {
+        const { error: reqError } = await supabase
+          .from('buyer_requests')
+          .update({ status: 'delivered' })
+          .eq('id', order.request_id);
+        
+        if (reqError) console.error('Error updating request status:', reqError);
+      }
+
+      await fetchData();
     } catch (err: any) {
       console.error('Error delivering order:', err);
       setError('Failed to deliver order.');
@@ -363,6 +411,7 @@ export default function OrderPage() {
   const handleCloseRequest = async () => {
     if (!id || !user) return;
     setClosing(true);
+    setError(null);
     try {
       const { error } = await supabase
         .from('buyer_requests')
@@ -393,8 +442,23 @@ export default function OrderPage() {
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6">
         <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
         <h1 className="text-2xl font-black uppercase tracking-widest text-white mb-2">Order Not Found</h1>
-        <p className="text-zinc-500 mb-8">{error || "The order or request you're looking for doesn't exist or you don't have permission to view it."}</p>
-        <Button variant="gold" onClick={() => router.push('/dashboard')}>Back to Dashboard</Button>
+        <p className="text-zinc-500 mb-8 text-center max-w-md">{error || "The order or request you're looking for doesn't exist or you don't have permission to view it."}</p>
+        <div className="flex gap-4">
+          <Button 
+            variant="outline" 
+            onClick={() => fetchData()} 
+            className="h-12 px-8 rounded-xl text-[10px] font-black uppercase tracking-widest border-zinc-800"
+          >
+            Retry
+          </Button>
+          <Button 
+            variant="gold" 
+            onClick={() => router.push('/dashboard')} 
+            className="h-12 px-8 rounded-xl text-[10px] font-black uppercase tracking-widest"
+          >
+            Back to Dashboard
+          </Button>
+        </div>
       </div>
     );
   }
@@ -665,11 +729,6 @@ export default function OrderPage() {
                             </div>
                             {isOpen && isBuyer && (
                               <div className="w-64">
-                                <PayPalScriptProvider options={{ 
-                                  clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "test",
-                                  currency: "USD",
-                                  intent: "capture"
-                                }}>
                                   <PayPalButtons 
                                     style={{ layout: "vertical", color: "gold", shape: "rect", label: "pay", height: 44 }}
                                     createOrder={(data: any, actions: any) => {
@@ -691,7 +750,6 @@ export default function OrderPage() {
                                       }
                                     }}
                                   />
-                                </PayPalScriptProvider>
                               </div>
                             )}
                             {isAccepted && (

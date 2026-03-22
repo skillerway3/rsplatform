@@ -79,6 +79,7 @@ export default function SellerVerifyPage() {
     setSubmitting(true);
     setError(null);
     try {
+      console.log('Submitting seller verification for user:', user.id);
       // Upload files to Supabase Storage
       const uploadFile = async (file: File, path: string) => {
         const fileExt = file.name.split('.').pop();
@@ -87,7 +88,10 @@ export default function SellerVerifyPage() {
           .from('verifications')
           .upload(fileName, file);
         
-        if (error) throw error;
+        if (error) {
+          console.error(`Error uploading ${path}:`, error);
+          throw error;
+        }
 
         return data.path;
       };
@@ -99,7 +103,7 @@ export default function SellerVerifyPage() {
       ]);
 
       // Create verification record
-      const { error } = await supabase
+      const { error: insertError } = await supabase
         .from('seller_verifications')
         .insert({
           user_id: user.id,
@@ -111,7 +115,10 @@ export default function SellerVerifyPage() {
           status: 'pending'
         });
 
-      if (error) throw error;
+      if (insertError) {
+        console.error('Error inserting verification record:', insertError);
+        throw insertError;
+      }
 
       // Send admin notification
       try {
@@ -128,16 +135,17 @@ export default function SellerVerifyPage() {
         console.error('Failed to notify admin:', notifyErr);
       }
 
+      console.log('Verification application submitted successfully');
       setStatus('pending');
       setSuccess(true);
       
       // Redirect after a short delay to show success message
       setTimeout(() => {
-        router.push('/sell/verify/pending');
+        router.replace('/sell/verify/pending');
       }, 1500);
     } catch (err: any) {
       console.error('Error submitting verification:', err);
-      setError('Failed to submit verification. Please ensure you have a "verifications" storage bucket created in Supabase.');
+      setError('Failed to submit verification. Please ensure you have a "verifications" storage bucket created in Supabase with public access for uploads.');
     } finally {
       setSubmitting(false);
     }

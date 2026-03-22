@@ -167,11 +167,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Failed to create order in database' }, { status: 500 });
     }
 
-    // 8. If it's a request, close the request
+    // 8. If it's a request, update the request status to matched
     if (requestId) {
       await supabaseAdmin
         .from('buyer_requests')
-        .update({ status: 'closed' })
+        .update({ status: 'matched' })
         .eq('id', requestId);
     }
 

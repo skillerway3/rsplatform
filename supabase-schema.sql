@@ -5,6 +5,8 @@ CREATE TABLE IF NOT EXISTS profiles (
   full_name TEXT,
   avatar_url TEXT,
   is_verified_seller BOOLEAN DEFAULT FALSE,
+  average_rating NUMERIC DEFAULT 0,
+  review_count INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -25,6 +27,24 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Seller Verifications Table
+CREATE TABLE IF NOT EXISTS seller_verifications (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users(id) NOT NULL UNIQUE,
+  phone_number TEXT NOT NULL,
+  document_type TEXT NOT NULL, -- id, driver_license, passport
+  id_front_url TEXT NOT NULL,
+  id_back_url TEXT NOT NULL,
+  selfie_url TEXT NOT NULL,
+  status TEXT DEFAULT 'pending', -- pending, approved, rejected, suspended
+  admin_notes TEXT,
+  rejection_reason TEXT,
+  reviewed_by UUID REFERENCES auth.users(id),
+  reviewed_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
 -- Trigger to update is_verified_seller on approval
 CREATE OR REPLACE FUNCTION public.handle_verification_update()
@@ -62,52 +82,6 @@ CREATE TABLE IF NOT EXISTS listings (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Orders Table
-CREATE TABLE IF NOT EXISTS orders (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  buyer_id UUID REFERENCES auth.users(id) NOT NULL,
-  seller_id UUID REFERENCES auth.users(id) NOT NULL,
-  listing_id UUID REFERENCES listings(id),
-  request_id UUID REFERENCES buyer_requests(id),
-  offer_id UUID REFERENCES buyer_request_offers(id),
-  total_price NUMERIC NOT NULL,
-  status TEXT DEFAULT 'pending', -- pending, processing, delivered, completed, cancelled, refunded, disputed
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  accepted_at TIMESTAMP WITH TIME ZONE,
-  deadline_at TIMESTAMP WITH TIME ZONE,
-  delivered_at TIMESTAMP WITH TIME ZONE,
-  resolved_at TIMESTAMP WITH TIME ZONE,
-  refunded_at TIMESTAMP WITH TIME ZONE
-);
-
--- Seller Verifications Table
-CREATE TABLE IF NOT EXISTS seller_verifications (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id) NOT NULL UNIQUE,
-  phone_number TEXT NOT NULL,
-  document_type TEXT NOT NULL, -- id, driver_license, passport
-  id_front_url TEXT NOT NULL,
-  id_back_url TEXT NOT NULL,
-  selfie_url TEXT NOT NULL,
-  status TEXT DEFAULT 'pending', -- pending, approved, rejected, suspended
-  admin_notes TEXT,
-  rejection_reason TEXT,
-  reviewed_by UUID REFERENCES auth.users(id),
-  reviewed_at TIMESTAMP WITH TIME ZONE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Buyer Request Proofs Table
-CREATE TABLE IF NOT EXISTS buyer_request_proofs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  order_id UUID REFERENCES orders(id) ON DELETE CASCADE NOT NULL,
-  seller_id UUID REFERENCES auth.users(id) NOT NULL,
-  file_url TEXT NOT NULL,
-  note TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
 -- Buyer Requests Table
 CREATE TABLE IF NOT EXISTS buyer_requests (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -141,6 +115,37 @@ CREATE TABLE IF NOT EXISTS buyer_request_offers (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Orders Table
+CREATE TABLE IF NOT EXISTS orders (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  buyer_id UUID REFERENCES auth.users(id) NOT NULL,
+  seller_id UUID REFERENCES auth.users(id) NOT NULL,
+  listing_id UUID REFERENCES listings(id),
+  request_id UUID REFERENCES buyer_requests(id),
+  offer_id UUID REFERENCES buyer_request_offers(id),
+  total_price NUMERIC NOT NULL,
+  status TEXT DEFAULT 'pending', -- pending, processing, delivered, completed, cancelled, refunded, disputed
+  payment_id TEXT,
+  payment_provider TEXT,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  accepted_at TIMESTAMP WITH TIME ZONE,
+  deadline_at TIMESTAMP WITH TIME ZONE,
+  delivered_at TIMESTAMP WITH TIME ZONE,
+  resolved_at TIMESTAMP WITH TIME ZONE,
+  refunded_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Buyer Request Proofs Table
+CREATE TABLE IF NOT EXISTS buyer_request_proofs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  order_id UUID REFERENCES orders(id) ON DELETE CASCADE NOT NULL,
+  seller_id UUID REFERENCES auth.users(id) NOT NULL,
+  file_url TEXT NOT NULL,
+  note TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Chat Threads for Requests
 CREATE TABLE IF NOT EXISTS buyer_request_threads (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -157,6 +162,17 @@ CREATE TABLE IF NOT EXISTS buyer_request_messages (
   thread_id UUID REFERENCES buyer_request_threads(id) ON DELETE CASCADE NOT NULL,
   sender_id UUID REFERENCES auth.users(id) NOT NULL,
   content TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Seller Reviews Table
+CREATE TABLE IF NOT EXISTS seller_reviews (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  order_id UUID REFERENCES orders(id) ON DELETE CASCADE NOT NULL UNIQUE,
+  seller_id UUID REFERENCES auth.users(id) NOT NULL,
+  buyer_id UUID REFERENCES auth.users(id) NOT NULL,
+  rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  review_text TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -224,6 +240,31 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Trigger to update profile rating stats on new review
+CREATE OR REPLACE FUNCTION public.handle_new_review()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE public.profiles
+  SET 
+    average_rating = (
+      SELECT AVG(rating)::NUMERIC(3,2)
+      FROM public.seller_reviews
+      WHERE seller_id = NEW.seller_id
+    ),
+    review_count = (
+      SELECT COUNT(*)
+      FROM public.seller_reviews
+      WHERE seller_id = NEW.seller_id
+    )
+  WHERE id = NEW.seller_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE TRIGGER on_review_created
+  AFTER INSERT ON public.seller_reviews
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_review();
+
 -- RLS Policies
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON profiles;
@@ -242,12 +283,13 @@ DROP POLICY IF EXISTS "Users can view own orders" ON orders;
 CREATE POLICY "Users can view own orders" ON orders FOR SELECT USING (auth.uid() = buyer_id OR auth.uid() = seller_id);
 DROP POLICY IF EXISTS "Buyers can create orders" ON orders;
 CREATE POLICY "Buyers can create orders" ON orders FOR INSERT WITH CHECK (auth.uid() = buyer_id);
-DROP POLICY IF EXISTS "Participants can update orders" ON orders;
+DROP POLICY IF EXISTS "Sellers can mark delivered" ON orders;
 CREATE POLICY "Sellers can mark delivered" ON orders FOR UPDATE USING (
   auth.uid() = seller_id AND status = 'processing'
 ) WITH CHECK (
   status = 'delivered'
 );
+DROP POLICY IF EXISTS "Buyers can complete or dispute" ON orders;
 CREATE POLICY "Buyers can complete or dispute" ON orders FOR UPDATE USING (
   auth.uid() = buyer_id AND status = 'delivered'
 ) WITH CHECK (
@@ -318,6 +360,18 @@ CREATE POLICY "Users can insert messages in their threads" ON buyer_request_mess
   auth.uid() = sender_id AND EXISTS (SELECT 1 FROM buyer_request_threads WHERE id = thread_id AND (auth.uid() = buyer_id OR auth.uid() = seller_id))
 );
 
+ALTER TABLE seller_reviews ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Reviews are viewable by everyone" ON seller_reviews;
+CREATE POLICY "Reviews are viewable by everyone" ON seller_reviews FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Buyers can insert reviews for their completed orders" ON seller_reviews;
+CREATE POLICY "Buyers can insert reviews for their completed orders" ON seller_reviews FOR INSERT WITH CHECK (
+  auth.uid() = buyer_id AND 
+  EXISTS (
+    SELECT 1 FROM orders 
+    WHERE id = order_id AND buyer_id = auth.uid() AND status IN ('completed', 'resolved')
+  )
+);
+
 -- Storage Policies for 'verifications' bucket
 -- Note: These assume the bucket exists. They apply to storage.objects.
 -- We use path segments to identify ownership.
@@ -363,58 +417,5 @@ CREATE POLICY "Users can view proofs" ON storage.objects FOR SELECT USING (
   EXISTS (
     SELECT 1 FROM public.orders 
     WHERE id::text = (storage.foldername(name))[2] AND (buyer_id = auth.uid() OR seller_id = auth.uid())
-  )
-);
-
--- Seller Reviews Table
-CREATE TABLE IF NOT EXISTS seller_reviews (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  order_id UUID REFERENCES orders(id) ON DELETE CASCADE NOT NULL UNIQUE,
-  seller_id UUID REFERENCES auth.users(id) NOT NULL,
-  buyer_id UUID REFERENCES auth.users(id) NOT NULL,
-  rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
-  review_text TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Add rating stats to profiles
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS average_rating NUMERIC DEFAULT 0;
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS review_count INTEGER DEFAULT 0;
-
--- Trigger to update profile rating stats on new review
-CREATE OR REPLACE FUNCTION public.handle_new_review()
-RETURNS TRIGGER AS $$
-BEGIN
-  UPDATE public.profiles
-  SET 
-    average_rating = (
-      SELECT AVG(rating)::NUMERIC(3,2)
-      FROM public.seller_reviews
-      WHERE seller_id = NEW.seller_id
-    ),
-    review_count = (
-      SELECT COUNT(*)
-      FROM public.seller_reviews
-      WHERE seller_id = NEW.seller_id
-    )
-  WHERE id = NEW.seller_id;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE OR REPLACE TRIGGER on_review_created
-  AFTER INSERT ON public.seller_reviews
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_review();
-
--- RLS Policies for seller_reviews
-ALTER TABLE seller_reviews ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Reviews are viewable by everyone" ON seller_reviews;
-CREATE POLICY "Reviews are viewable by everyone" ON seller_reviews FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Buyers can insert reviews for their completed orders" ON seller_reviews;
-CREATE POLICY "Buyers can insert reviews for their completed orders" ON seller_reviews FOR INSERT WITH CHECK (
-  auth.uid() = buyer_id AND 
-  EXISTS (
-    SELECT 1 FROM orders 
-    WHERE id = order_id AND buyer_id = auth.uid() AND status IN ('completed', 'resolved')
   )
 );
