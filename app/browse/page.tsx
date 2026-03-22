@@ -94,16 +94,7 @@ function BrowseContent() {
       try {
         let query = supabase
           .from('listings')
-          .select(`
-            *,
-            seller:profiles!listings_seller_id_fkey (
-              username,
-              avatar_url,
-              is_verified_seller,
-              average_rating,
-              review_count
-            )
-          `)
+          .select('*')
           .eq('status', 'active');
 
         if (selectedGame !== 'all') {
@@ -126,26 +117,55 @@ function BrowseContent() {
         const { data, error: fetchError } = await query.order('created_at', { ascending: false });
 
         if (fetchError) throw fetchError;
-        
-        // Transform data to match the expected Listing type if necessary
-        const transformedData = data?.map((item: any) => ({
-          ...item,
-          gameId: item.game,
-          categoryId: item.category,
-          sellerId: item.seller_id,
-          deliveryTime: 'Instant Delivery', // Default or from DB if added
-          deliveryMethod: 'In-game Trade', // Default or from DB if added
-          seller: {
-            id: item.seller_id,
-            username: item.seller?.username || 'Unknown',
-            avatar: item.seller?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.seller_id}`,
-            isVerified: item.seller?.is_verified_seller || false,
-            rating: item.seller?.average_rating || 0,
-            totalSales: item.seller?.review_count || 0,
-          }
-        }));
 
-        setListings(transformedData || []);
+        const sellerIds = [
+          ...new Set((data ?? []).map((item: any) => item.seller_id).filter(Boolean)),
+        ];
+
+        let sellerMap = new Map<string, any>();
+
+        if (sellerIds.length > 0) {
+          const { data: profiles, error: profilesError } = await supabase
+            .from('profiles')
+            .select(`
+              id,
+              username,
+              avatar_url,
+              is_verified_seller,
+              average_rating,
+              review_count
+            `)
+            .in('id', sellerIds);
+
+          if (profilesError) throw profilesError;
+
+          sellerMap = new Map((profiles ?? []).map((profile: any) => [profile.id, profile]));
+        }
+
+        const transformedData = (data ?? []).map((item: any) => {
+          const seller = sellerMap.get(item.seller_id);
+
+          return {
+            ...item,
+            gameId: item.game,
+            categoryId: item.category,
+            sellerId: item.seller_id,
+            deliveryTime: 'Instant Delivery',
+            deliveryMethod: 'In-game Trade',
+            seller: {
+              id: item.seller_id,
+              username: seller?.username || 'Unknown',
+              avatar:
+                seller?.avatar_url ||
+                `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.seller_id}`,
+              isVerified: seller?.is_verified_seller || false,
+              rating: seller?.average_rating || 0,
+              totalSales: seller?.review_count || 0,
+            },
+          };
+        });
+
+        setListings(transformedData);
       } catch (err: any) {
         console.error('Error fetching listings:', err);
         setError(err.message);

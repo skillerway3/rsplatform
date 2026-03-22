@@ -44,21 +44,27 @@ export default function ListingDetailPage() {
       try {
         const { data, error: fetchError } = await supabase
           .from('listings')
-          .select(`
-            *,
-            seller:profiles!listings_seller_id_fkey (
-              username,
-              avatar_url,
-              is_verified_seller,
-              average_rating,
-              review_count
-            )
-          `)
+          .select('*')
           .eq('id', id)
           .single();
 
         if (fetchError) throw fetchError;
-        
+
+        const { data: sellerProfile, error: profileError } = await supabase
+          .from('profiles')
+          .select(`
+            id,
+            username,
+            avatar_url,
+            is_verified_seller,
+            average_rating,
+            review_count
+          `)
+          .eq('id', data.seller_id)
+          .maybeSingle();
+
+        if (profileError) throw profileError;
+
         const transformedListing = {
           ...data,
           gameId: data.game,
@@ -67,11 +73,13 @@ export default function ListingDetailPage() {
           deliveryMethod: 'In-game Trade',
           seller: {
             id: data.seller_id,
-            username: data.seller?.username || 'Unknown',
-            avatar: data.seller?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.seller_id}`,
-            isVerified: data.seller?.is_verified_seller || false,
-            rating: data.seller?.average_rating || 0,
-            totalSales: data.seller?.review_count || 0,
+            username: sellerProfile?.username || 'Unknown',
+            avatar:
+              sellerProfile?.avatar_url ||
+              `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.seller_id}`,
+            isVerified: sellerProfile?.is_verified_seller || false,
+            rating: sellerProfile?.average_rating || 0,
+            totalSales: sellerProfile?.review_count || 0,
           }
         };
 
