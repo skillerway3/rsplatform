@@ -12,7 +12,9 @@ import {
   Loader2, 
   ArrowLeft,
   Camera,
-  CheckCircle2
+  CheckCircle2,
+  AlertCircle,
+  Zap
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -27,7 +29,9 @@ interface Profile {
   username: string;
   avatar_url: string;
   is_verified_seller: boolean;
+  is_trusted_seller: boolean;
   created_at: string;
+  username_updated_at?: string;
 }
 
 export default function ProfilePage() {
@@ -80,12 +84,11 @@ export default function ProfilePage() {
     setSuccess(false);
 
     try {
+      const updateData: any = { username };
+      
       const { error } = await supabase
         .from('profiles')
-        .update({ 
-          username,
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', user.id);
 
       if (error) throw error;
@@ -93,7 +96,9 @@ export default function ProfilePage() {
       setProfile(prev => prev ? ({ ...prev, username }) : null);
     } catch (err: any) {
       console.error('Error updating profile:', err);
-      setError('Failed to update profile. Username might be taken.');
+      // Handle the specific error from the trigger
+      const message = err.message || 'Failed to update profile. Username might be taken.';
+      setError(message.includes('30 days') ? message : 'Failed to update profile. Username might be taken.');
     } finally {
       setUpdating(false);
     }
@@ -109,16 +114,16 @@ export default function ProfilePage() {
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}-${Math.random()}.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
+      const filePath = `${user.id}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('verifications') // Reusing verifications bucket for simplicity or create a new one
+        .from('avatars')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
-        .from('verifications')
+        .from('avatars')
         .getPublicUrl(filePath);
 
       const { error: updateError } = await supabase
@@ -222,6 +227,17 @@ export default function ProfilePage() {
                       {profile?.is_verified_seller ? 'Verified' : 'Unverified'}
                     </span>
                   </div>
+                  {profile?.is_trusted_seller && (
+                    <div className="flex items-center justify-between p-4 bg-amber-500/5 rounded-2xl border border-amber-500/10">
+                      <div className="flex items-center gap-3">
+                        <Zap className="w-4 h-4 text-amber-500" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-amber-500">Trusted Seller</span>
+                      </div>
+                      <span className="text-[9px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-500 px-2 py-1 rounded-lg">
+                        Elite
+                      </span>
+                    </div>
+                  )}
                   {!profile?.is_verified_seller && (
                     <Link href="/sell/verify" className="block">
                       <Button variant="gold" className="w-full h-12 rounded-xl text-[10px] font-black uppercase tracking-widest">

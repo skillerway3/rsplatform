@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Send, Loader2, User, ShieldCheck, Clock } from 'lucide-react';
+import { X, Send, Loader2, User, ShieldCheck, Clock, Zap, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Button } from '@/components/ui/Button';
@@ -31,6 +31,7 @@ export function ChatModal({ isOpen, onClose, requestId, sellerId, buyerId, title
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
+  const [otherUser, setOtherUser] = useState<{ username: string; is_verified_seller: boolean; is_trusted_seller: boolean } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -39,6 +40,16 @@ export function ChatModal({ isOpen, onClose, requestId, sellerId, buyerId, title
     const setupChat = async () => {
       setLoading(true);
       try {
+        // Fetch other user profile
+        const otherId = user.id === buyerId ? sellerId : buyerId;
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username, is_verified_seller, is_trusted_seller')
+          .eq('id', otherId)
+          .single();
+        
+        if (profile) setOtherUser(profile);
+
         // 1. Get or create thread
         let { data: thread, error: threadError } = await supabase
           .from('buyer_request_threads')
@@ -158,11 +169,25 @@ export function ChatModal({ isOpen, onClose, requestId, sellerId, buyerId, title
                   <User className="w-5 h-5 text-amber-500" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-white uppercase tracking-widest truncate max-w-[200px]">{title}</h3>
-                  <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5 flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    Active Conversation
-                  </p>
+                  <h3 className="text-sm font-black text-white uppercase tracking-widest truncate max-w-[200px]">{otherUser?.username || title}</h3>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      Active
+                    </p>
+                    {otherUser?.is_verified_seller && (
+                      <div className="flex items-center gap-1 px-1 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md">
+                        <ShieldCheck className="w-2 h-2 text-emerald-500" />
+                        <span className="text-[6px] font-black text-emerald-500 uppercase tracking-widest">Verified</span>
+                      </div>
+                    )}
+                    {otherUser?.is_trusted_seller && (
+                      <div className="flex items-center gap-1 px-1 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded-md">
+                        <Zap className="w-2 h-2 text-amber-500" />
+                        <span className="text-[6px] font-black text-amber-500 uppercase tracking-widest">Trusted</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
               <button 

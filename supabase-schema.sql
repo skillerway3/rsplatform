@@ -5,10 +5,44 @@ CREATE TABLE IF NOT EXISTS profiles (
   full_name TEXT,
   avatar_url TEXT,
   is_verified_seller BOOLEAN DEFAULT FALSE,
+  is_trusted_seller BOOLEAN DEFAULT FALSE,
   average_rating NUMERIC DEFAULT 0,
   review_count INTEGER DEFAULT 0,
+  manual_trusted_override BOOLEAN DEFAULT FALSE,
+  username_updated_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Trigger to enforce 30-day username change restriction and prevent reserved usernames
+CREATE OR REPLACE FUNCTION public.check_username_update()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Prevent reserved usernames if it's a new username or an update to a different reserved username
+  IF NEW.username IS NOT NULL AND LOWER(NEW.username) IN ('admin', 'support', 'rsplatform') THEN
+    IF TG_OP = 'INSERT' THEN
+      RAISE EXCEPTION 'Username "%" is reserved and cannot be used.', NEW.username;
+    ELSIF TG_OP = 'UPDATE' THEN
+      IF OLD.username IS NULL OR LOWER(OLD.username) != LOWER(NEW.username) THEN
+        RAISE EXCEPTION 'Username "%" is reserved and cannot be used.', NEW.username;
+      END IF;
+    END IF;
+  END IF;
+
+  -- Handle 30-day username change restriction
+  IF TG_OP = 'UPDATE' AND OLD.username IS NOT NULL AND NEW.username != OLD.username THEN
+    IF OLD.username_updated_at IS NOT NULL AND (NOW() - OLD.username_updated_at) < INTERVAL '30 days' THEN
+      RAISE EXCEPTION 'You can only change your username once every 30 days. Please wait % more days.', 
+        30 - EXTRACT(DAY FROM (NOW() - OLD.username_updated_at));
+    END IF;
+    NEW.username_updated_at = NOW();
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE TRIGGER on_username_update
+  BEFORE INSERT OR UPDATE ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.check_username_update();
 
 -- Trigger to create profile on signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -128,6 +162,13 @@ CREATE TABLE IF NOT EXISTS orders (
   payment_id TEXT,
   payment_provider TEXT,
   metadata JSONB DEFAULT '{}'::jsonb,
+  platform_fee NUMERIC DEFAULT 0,
+  seller_payout NUMERIC DEFAULT 0,
+  decline_reason TEXT,
+  extra_time_requested_at TIMESTAMP WITH TIME ZONE,
+  extra_time_reason TEXT,
+  extra_time_hours INTEGER,
+  extra_time_status TEXT, -- pending, accepted, declined
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   accepted_at TIMESTAMP WITH TIME ZONE,
   deadline_at TIMESTAMP WITH TIME ZONE,
@@ -177,100 +218,96 @@ CREATE TABLE IF NOT EXISTS seller_reviews (
 );
 
 -- RPC for accepting an offer atomically
-CREATE OR REPLACE FUNCTION accept_offer(
-  p_request_id UUID,
-  p_offer_id UUID
-) RETURNS UUID AS $$
-DECLARE
-  v_buyer_id UUID;
-  v_seller_id UUID;
-  v_price NUMERIC;
-  v_order_id UUID;
-BEGIN
-  -- 1. Verify request is open and not expired AND caller is the buyer
-  SELECT buyer_id INTO v_buyer_id
-  FROM buyer_requests
-  WHERE id = p_request_id AND status = 'open' AND expires_at > NOW() AND buyer_id = auth.uid();
-  
-  IF v_buyer_id IS NULL THEN
-    RAISE EXCEPTION 'Request is not available for acceptance or you are not the buyer';
-  END IF;
-
-  -- 2. Verify p_offer_id belongs to p_request_id
-  SELECT seller_id, price INTO v_seller_id, v_price
-  FROM buyer_request_offers
-  WHERE id = p_offer_id AND request_id = p_request_id AND status = 'pending';
-
-  IF v_seller_id IS NULL THEN
-    RAISE EXCEPTION 'Offer is not available';
-  END IF;
-
-  -- 3. Update request
-  UPDATE buyer_requests
-  SET status = 'in_progress', accepted_offer_id = p_offer_id
-  WHERE id = p_request_id;
-
-  -- 4. Update offers
-  UPDATE buyer_request_offers
-  SET status = 'accepted'
-  WHERE id = p_offer_id;
-
-  UPDATE buyer_request_offers
-  SET status = 'rejected'
-  WHERE request_id = p_request_id AND id != p_offer_id;
-
-  -- 5. Create order
-  INSERT INTO orders (
-    buyer_id,
-    seller_id,
-    request_id,
-    offer_id,
-    total_price,
-    status
-  ) VALUES (
-    v_buyer_id,
-    v_seller_id,
-    p_request_id,
-    p_offer_id,
-    v_price,
-    'processing'
-  ) RETURNING id INTO v_order_id;
-
-  RETURN v_order_id;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
 -- Trigger to update profile rating stats on new review
 CREATE OR REPLACE FUNCTION public.handle_new_review()
 RETURNS TRIGGER AS $$
+DECLARE
+  avg_rating NUMERIC;
+  cnt INTEGER;
+  v_seller_id UUID;
 BEGIN
+  IF (TG_OP = 'DELETE') THEN
+    v_seller_id := OLD.seller_id;
+  ELSE
+    v_seller_id := NEW.seller_id;
+  END IF;
+
+  SELECT COALESCE(AVG(rating), 0)::NUMERIC(3,2), COUNT(*)
+  INTO avg_rating, cnt
+  FROM public.seller_reviews
+  WHERE seller_id = v_seller_id;
+
   UPDATE public.profiles
   SET 
-    average_rating = (
-      SELECT AVG(rating)::NUMERIC(3,2)
-      FROM public.seller_reviews
-      WHERE seller_id = NEW.seller_id
-    ),
-    review_count = (
-      SELECT COUNT(*)
-      FROM public.seller_reviews
-      WHERE seller_id = NEW.seller_id
-    )
-  WHERE id = NEW.seller_id;
+    average_rating = avg_rating,
+    review_count = cnt,
+    is_trusted_seller = (manual_trusted_override OR (cnt >= 10 AND avg_rating >= 4.5))
+  WHERE id = v_seller_id;
+
+  IF (TG_OP = 'DELETE') THEN
+    RETURN OLD;
+  END IF;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE OR REPLACE TRIGGER on_review_created
-  AFTER INSERT ON public.seller_reviews
+DROP TRIGGER IF EXISTS on_review_created ON public.seller_reviews;
+CREATE TRIGGER on_review_created
+  AFTER INSERT OR UPDATE OR DELETE ON public.seller_reviews
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_review();
 
 -- RLS Policies
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON profiles;
 CREATE POLICY "Public profiles are viewable by everyone" ON profiles FOR SELECT USING (true);
+
 DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
 CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
+
+-- Admin policy for profiles
+DROP POLICY IF EXISTS "Admins can update any profile" ON profiles;
+CREATE POLICY "Admins can update any profile" ON profiles FOR UPDATE USING (
+  auth.jwt() ->> 'email' = 'skillerway100@gmail.com'
+);
+
+-- Trigger to prevent non-admins from updating sensitive profile fields
+CREATE OR REPLACE FUNCTION public.protect_profile_fields()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- If not admin, reset sensitive fields to OLD values
+  IF NOT (
+    auth.jwt() ->> 'email' = 'skillerway100@gmail.com'
+  ) THEN
+    NEW.is_verified_seller := OLD.is_verified_seller;
+    NEW.is_trusted_seller := OLD.is_trusted_seller;
+    NEW.manual_trusted_override := OLD.manual_trusted_override;
+    NEW.average_rating := OLD.average_rating;
+    NEW.review_count := OLD.review_count;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_profile_update_protect ON public.profiles;
+CREATE TRIGGER on_profile_update_protect
+  BEFORE UPDATE ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.protect_profile_fields();
+
+-- Trigger to recalculate is_trusted_seller when manual_trusted_override changes
+CREATE OR REPLACE FUNCTION public.handle_profile_trust_update()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF (OLD.manual_trusted_override IS DISTINCT FROM NEW.manual_trusted_override) THEN
+    NEW.is_trusted_seller := (NEW.manual_trusted_override OR (NEW.review_count >= 10 AND NEW.average_rating >= 4.5));
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_profile_trust_update ON public.profiles;
+CREATE TRIGGER on_profile_trust_update
+  BEFORE UPDATE ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.handle_profile_trust_update();
 
 ALTER TABLE listings ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Listings are viewable by everyone" ON listings;
@@ -300,15 +337,23 @@ ALTER TABLE seller_verifications ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view own verification" ON seller_verifications;
 CREATE POLICY "Users can view own verification" ON seller_verifications FOR SELECT USING (
   auth.uid() = user_id OR 
-  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND username = 'admin') OR
-  (SELECT email FROM auth.users WHERE id = auth.uid()) = 'skillerway100@gmail.com'
+  auth.jwt() ->> 'email' = 'skillerway100@gmail.com'
 );
 DROP POLICY IF EXISTS "Users can insert own verification" ON seller_verifications;
 CREATE POLICY "Users can insert own verification" ON seller_verifications FOR INSERT WITH CHECK (auth.uid() = user_id);
 DROP POLICY IF EXISTS "Admins can update verifications" ON seller_verifications;
 CREATE POLICY "Admins can update verifications" ON seller_verifications FOR UPDATE USING (
-  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND username = 'admin') OR
-  (SELECT email FROM auth.users WHERE id = auth.uid()) = 'skillerway100@gmail.com'
+  auth.jwt() ->> 'email' = 'skillerway100@gmail.com'
+);
+DROP POLICY IF EXISTS "Admins can manage all verifications" ON seller_verifications;
+CREATE POLICY "Admins can manage all verifications" ON seller_verifications FOR ALL USING (
+  auth.jwt() ->> 'email' = 'skillerway100@gmail.com'
+);
+
+-- Admin policy for manual_trusted_override
+DROP POLICY IF EXISTS "Admins can update trusted override" ON profiles;
+CREATE POLICY "Admins can update trusted override" ON profiles FOR UPDATE USING (
+  auth.jwt() ->> 'email' = 'skillerway100@gmail.com'
 );
 
 ALTER TABLE buyer_request_proofs ENABLE ROW LEVEL SECURITY;
@@ -372,6 +417,23 @@ CREATE POLICY "Buyers can insert reviews for their completed orders" ON seller_r
   )
 );
 
+-- Notifications Table
+CREATE TABLE IF NOT EXISTS notifications (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  type TEXT NOT NULL, -- new_offer, offer_accepted, order_delivered, order_completed, new_message, system
+  title TEXT NOT NULL,
+  content TEXT NOT NULL,
+  link TEXT,
+  is_read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- RLS Policies for notifications
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can manage their own notifications" ON notifications;
+CREATE POLICY "Users can manage their own notifications" ON notifications FOR ALL USING (auth.uid() = user_id);
+
 -- Storage Policies for 'verifications' bucket
 -- Note: These assume the bucket exists. They apply to storage.objects.
 -- We use path segments to identify ownership.
@@ -392,8 +454,15 @@ CREATE POLICY "Users can view their own verifications" ON storage.objects FOR SE
 DROP POLICY IF EXISTS "Admins can view all verifications" ON storage.objects;
 CREATE POLICY "Admins can view all verifications" ON storage.objects FOR SELECT USING (
   bucket_id = 'verifications' AND (
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND username = 'admin') OR
-    (SELECT email FROM auth.users WHERE id = auth.uid()) = 'skillerway100@gmail.com'
+    auth.jwt() ->> 'email' = 'skillerway100@gmail.com'
+  )
+);
+
+-- 4. Allow admins to manage all verifications
+DROP POLICY IF EXISTS "Admins can manage all verifications" ON storage.objects;
+CREATE POLICY "Admins can manage all verifications" ON storage.objects FOR ALL USING (
+  bucket_id = 'verifications' AND (
+    auth.jwt() ->> 'email' = 'skillerway100@gmail.com'
   )
 );
 
@@ -418,4 +487,28 @@ CREATE POLICY "Users can view proofs" ON storage.objects FOR SELECT USING (
     SELECT 1 FROM public.orders 
     WHERE id::text = (storage.foldername(name))[2] AND (buyer_id = auth.uid() OR seller_id = auth.uid())
   )
+);
+
+-- 6. Avatars bucket policies
+-- Create avatars bucket if it doesn't exist
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('avatars', 'avatars', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Allow everyone to view avatars
+DROP POLICY IF EXISTS "Avatars are publicly viewable" ON storage.objects;
+CREATE POLICY "Avatars are publicly viewable" ON storage.objects FOR SELECT USING (
+  bucket_id = 'avatars'
+);
+
+-- Allow users to upload their own avatar
+DROP POLICY IF EXISTS "Users can upload own avatar" ON storage.objects;
+CREATE POLICY "Users can upload own avatar" ON storage.objects FOR INSERT WITH CHECK (
+  bucket_id = 'avatars' AND (auth.uid())::text = (storage.foldername(name))[1]
+);
+
+-- Allow users to update their own avatar
+DROP POLICY IF EXISTS "Users can update own avatar" ON storage.objects;
+CREATE POLICY "Users can update own avatar" ON storage.objects FOR UPDATE USING (
+  bucket_id = 'avatars' AND (auth.uid())::text = (storage.foldername(name))[1]
 );

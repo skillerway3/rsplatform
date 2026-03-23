@@ -6,15 +6,15 @@
 }
 
 :root {
-  --background: #09090b;
+  --background: #0d0d0f;
   --foreground: #fafafa;
   --primary: #f59e0b;
   --primary-foreground: #09090b;
-  --secondary: #27272a;
+  --secondary: #18181b;
   --secondary-foreground: #fafafa;
-  --muted: #27272a;
+  --muted: #18181b;
   --muted-foreground: #a1a1aa;
-  --accent: #27272a;
+  --accent: #18181b;
   --accent-foreground: #fafafa;
   --destructive: #ef4444;
   --destructive-foreground: #fafafa;
@@ -25,20 +25,20 @@
 
 @layer base {
   * {
-    @apply border-zinc-800;
+    @apply border-zinc-800/40;
   }
   body {
-    @apply bg-zinc-950 text-zinc-100 font-sans antialiased selection:bg-amber-500/30 selection:text-amber-200;
+    @apply bg-[#0f0f11] text-zinc-100 font-sans antialiased selection:bg-amber-500/30 selection:text-amber-200;
   }
 }
 
 @layer components {
   .glass {
-    @apply bg-zinc-900/50 backdrop-blur-xl border border-white/5;
+    @apply bg-[#161618]/50 backdrop-blur-xl border border-white/5;
   }
   
   .premium-card {
-    @apply bg-zinc-900/40 backdrop-blur-2xl border border-zinc-800/50 rounded-[2.5rem] shadow-2xl transition-all duration-500 hover:border-amber-500/30 hover:shadow-amber-500/5;
+    @apply bg-[#161618]/40 backdrop-blur-2xl border border-zinc-800/40 rounded-[2.5rem] shadow-2xl transition-all duration-500 hover:border-amber-500/30 hover:shadow-amber-500/5;
   }
 
   .text-gradient-gold {

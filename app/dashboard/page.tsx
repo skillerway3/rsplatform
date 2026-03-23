@@ -8,7 +8,8 @@ import { DashboardStats } from '@/components/dashboard/DashboardStats';
 import { DashboardRevenueChart } from '@/components/dashboard/DashboardRevenueChart';
 import { DashboardRecentActivity } from '@/components/dashboard/DashboardRecentActivity';
 import { DashboardInventory } from '@/components/dashboard/DashboardInventory';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ChevronRight, Plus, Zap, DollarSign } from 'lucide-react';
+import Link from 'next/link';
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
@@ -24,12 +25,22 @@ export default function DashboardPage() {
   const [userListings, setUserListings] = useState<any[]>([]);
   const [revenueData, setRevenueData] = useState<{ name: string; value: number }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<any>(null);
 
   useEffect(() => {
     if (!user) return;
 
     const fetchDashboardData = async () => {
       try {
+        // Fetch user's profile
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        
+        setProfile(profileData);
+
         // Fetch user's listings (if they are a seller)
         const { data: listings } = await supabase
           .from('listings')
@@ -155,7 +166,11 @@ export default function DashboardPage() {
 
       <div className="container mx-auto px-6 relative z-10">
         <div className="max-w-7xl mx-auto space-y-16">
-          <DashboardHeader username={user.email?.split('@')[0] || 'User'} />
+          <DashboardHeader 
+            username={user.email?.split('@')[0] || 'User'} 
+            isVerified={profile?.is_verified_seller}
+            isTrusted={profile?.is_trusted_seller}
+          />
           
           <DashboardStats 
             listingCount={stats.listingCount} 
@@ -166,11 +181,49 @@ export default function DashboardPage() {
           />
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <DashboardRevenueChart data={revenueData} />
-            <DashboardRecentActivity activities={recentOrders} />
-          </div>
+            <div className="lg:col-span-2 space-y-8">
+              <DashboardRevenueChart data={revenueData} />
+              <DashboardRecentActivity activities={recentOrders} />
+            </div>
+            
+            <div className="space-y-8">
+              {/* Quick Actions */}
+              <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2rem] p-8 backdrop-blur-xl">
+                <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em] mb-6">Quick Actions</h3>
+                <div className="grid grid-cols-1 gap-3">
+                  <Link href="/marketplace/submit" className="flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-2xl hover:bg-white/10 hover:border-amber-500/20 transition-all group">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-amber-500/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Plus className="w-5 h-5 text-amber-500" />
+                      </div>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest">New Request</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-zinc-700 group-hover:text-amber-500 transition-colors" />
+                  </Link>
+                  <Link href="/dashboard/requests" className="flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-2xl hover:bg-white/10 hover:border-amber-500/20 transition-all group">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Zap className="w-5 h-5 text-zinc-400" />
+                      </div>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest">My Requests</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-zinc-700 group-hover:text-amber-500 transition-colors" />
+                  </Link>
+                  <Link href="/dashboard/sales" className="flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-2xl hover:bg-white/10 hover:border-amber-500/20 transition-all group">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <DollarSign className="w-5 h-5 text-zinc-400" />
+                      </div>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest">My Sales</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-zinc-700 group-hover:text-amber-500 transition-colors" />
+                  </Link>
+                </div>
+              </div>
 
-          <DashboardInventory listings={userListings} />
+              <DashboardInventory listings={userListings} />
+            </div>
+          </div>
         </div>
       </div>
     </div>

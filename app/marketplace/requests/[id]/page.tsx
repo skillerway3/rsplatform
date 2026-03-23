@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { ChatModal } from '@/components/marketplace/ChatModal';
+import { createNotification } from '@/lib/notifications';
 
 interface Request {
   id: string;
@@ -174,6 +175,15 @@ export default function SellerRequestPage() {
         if (reqError) console.error('Error updating request status:', reqError);
       }
 
+      // 5. Notify buyer
+      await createNotification({
+        userId: order.buyer_id,
+        type: 'order_delivered',
+        title: 'Order Delivered',
+        content: `Your order for "${request?.title}" has been delivered. Please review and approve it.`,
+        link: `/orders/${order.id}`
+      });
+
       console.log('Service delivered successfully, refreshing data...');
       // Instead of reload, we re-fetch the data
       setLoading(true);
@@ -245,6 +255,15 @@ export default function SellerRequestPage() {
         console.error('Supabase error submitting offer:', error);
         throw error;
       }
+
+      // Notify buyer
+      await createNotification({
+        userId: request.buyer_id,
+        type: 'new_offer',
+        title: 'New Offer Received',
+        content: `You received a new offer of $${offerPrice} for your request "${request.title}".`,
+        link: `/marketplace/requests/${request.id}`
+      });
 
       console.log('Offer submitted successfully');
       setHasSubmittedOffer(true);
@@ -476,6 +495,20 @@ export default function SellerRequestPage() {
                       />
                     </div>
                   </div>
+
+                  {offerPrice && parseFloat(offerPrice) > 0 && (
+                    <div className="p-6 bg-amber-500/[0.03] border border-amber-500/10 rounded-2xl flex items-center justify-between">
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Estimated Payout</p>
+                        <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-widest">After 5% platform fee</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-black text-amber-500 tracking-tighter">
+                          ${(parseFloat(offerPrice) * 0.95).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="space-y-3">
                     <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em] ml-1">Message to Buyer</label>

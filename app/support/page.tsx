@@ -15,15 +15,18 @@ import {
   ExternalLink,
   LifeBuoy,
   Lock,
-  Zap
+  Zap,
+  X,
+  Send,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
-import { motion } from 'motion/react';
-import { SUPPORT_TICKETS } from '@/data/mock';
-import { formatDate, cn } from '@/lib/utils';
+import { motion, AnimatePresence } from 'motion/react';
+import { cn } from '@/lib/utils';
 
 const FAQ_CATEGORIES = [
   { id: 'buying', name: 'Buying Assets', icon: Globe },
@@ -58,6 +61,48 @@ const FAQS = [
 export default function SupportPage() {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedCategory, setSelectedCategory] = React.useState('buying');
+  const [isFormOpen, setIsFormOpen] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [submitSuccess, setSubmitSuccess] = React.useState(false);
+  const [submitError, setSubmitError] = React.useState<string | null>(null);
+  const [formData, setFormData] = React.useState({
+    name: '',
+    email: '',
+    subject: '',
+    message: '',
+    type: 'support'
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const response = await fetch('/api/support', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        setSubmitSuccess(true);
+        setFormData({ name: '', email: '', subject: '', message: '', type: 'support' });
+        setTimeout(() => {
+          setSubmitSuccess(false);
+          setIsFormOpen(false);
+        }, 3000);
+      } else {
+        setSubmitError(result.error || 'Failed to send message. Please try again.');
+      }
+    } catch (error) {
+      console.error('Failed to send support request:', error);
+      setSubmitError('A network error occurred. Please check your connection.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="pt-32 pb-32 bg-zinc-950 min-h-screen relative overflow-hidden">
@@ -71,10 +116,11 @@ export default function SupportPage() {
         <div className="max-w-6xl mx-auto space-y-24">
           {/* Hero Section */}
           <header className="text-center space-y-8">
-            <div className="text-amber-500 text-[10px] font-black uppercase tracking-[0.4em] mb-4">Support Center</div>
-            <h1 className="text-7xl font-black text-zinc-100 tracking-tighter uppercase leading-none">Support Center</h1>
+            <div className="text-amber-500 text-[10px] font-black uppercase tracking-[0.4em] mb-4">Contact Us</div>
+            <h1 className="text-7xl font-black text-zinc-100 tracking-tighter uppercase leading-none">Contact <span className="text-gradient-gold">Us</span></h1>
             <p className="text-zinc-500 text-sm font-medium uppercase tracking-widest max-w-2xl mx-auto leading-relaxed">
-              Access our comprehensive knowledge base or connect with our support specialists for immediate assistance.
+              Have a question or need assistance? Our team is here to help you 24/7.
+              Choose your preferred way to get in touch.
             </p>
             
             <div className="max-w-2xl mx-auto relative group">
@@ -99,7 +145,14 @@ export default function SupportPage() {
               <p className="text-zinc-500 text-[11px] font-medium uppercase tracking-widest leading-relaxed mb-8">
                 Connect with a human agent for real-time resolution.
               </p>
-              <Button variant="gold" className="w-full rounded-xl font-black uppercase tracking-widest text-[10px] h-12">
+              <Button 
+                variant="gold" 
+                className="w-full rounded-xl font-black uppercase tracking-widest text-[10px] h-12"
+                onClick={() => {
+                  const widget = document.getElementById('live-chat-trigger');
+                  if (widget) widget.click();
+                }}
+              >
                 Start Chat
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
@@ -113,7 +166,11 @@ export default function SupportPage() {
               <p className="text-zinc-500 text-[11px] font-medium uppercase tracking-widest leading-relaxed mb-8">
                 Submit a request for complex technical issues.
               </p>
-              <Button variant="secondary" className="w-full rounded-xl font-black uppercase tracking-widest text-[10px] h-12">
+              <Button 
+                variant="secondary" 
+                className="w-full rounded-xl font-black uppercase tracking-widest text-[10px] h-12"
+                onClick={() => setIsFormOpen(true)}
+              >
                 Open Ticket
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
@@ -127,15 +184,156 @@ export default function SupportPage() {
               <p className="text-zinc-500 text-[11px] font-medium uppercase tracking-widest leading-relaxed mb-8">
                 Detailed guides on platform mechanics.
               </p>
-              <Button variant="ghost" className="w-full rounded-xl font-black uppercase tracking-widest text-[10px] h-12 border border-zinc-800">
+              <Button 
+                variant="ghost" 
+                className="w-full rounded-xl font-black uppercase tracking-widest text-[10px] h-12 border border-zinc-800"
+                onClick={() => {
+                  const el = document.getElementById('faq-section');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }}
+              >
                 Browse Guides
                 <ExternalLink className="w-4 h-4 ml-2" />
               </Button>
             </Card>
           </div>
 
+          {/* Direct Contact Info */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <Card className="premium-card p-8 bg-zinc-900/30 border-white/5">
+              <div className="flex items-center space-x-6">
+                <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center shrink-0">
+                  <Mail className="w-6 h-6 text-amber-500" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-1">Direct Email</p>
+                  <a href="mailto:admin@rsplatform.gg" className="text-lg font-black text-white hover:text-amber-500 transition-colors tracking-tight">admin@rsplatform.gg</a>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="premium-card p-8 bg-zinc-900/30 border-white/5">
+              <div className="flex items-center space-x-6">
+                <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center shrink-0">
+                  <Clock className="w-6 h-6 text-blue-500" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-1">Response Time</p>
+                  <p className="text-lg font-black text-white tracking-tight">Under 15 Minutes <span className="text-zinc-500 text-sm font-medium ml-2 uppercase tracking-widest">(24/7)</span></p>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* Support Form Modal */}
+          <AnimatePresence>
+            {isFormOpen && (
+              <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setIsFormOpen(false)}
+                  className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm"
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                  className="relative w-full max-w-lg bg-[#141416] border border-white/10 rounded-[2.5rem] p-10 shadow-2xl"
+                >
+                  <button 
+                    onClick={() => setIsFormOpen(false)}
+                    className="absolute top-8 right-8 text-zinc-500 hover:text-white transition-colors"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+
+                  {submitSuccess ? (
+                    <div className="text-center py-10">
+                      <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-500/20">
+                        <Send className="w-8 h-8 text-emerald-500" />
+                      </div>
+                      <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-4">Message Sent</h3>
+                      <p className="text-zinc-500 text-sm font-medium leading-relaxed">
+                        Thank you for contacting us. We will get back to you shortly.
+                      </p>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                      <div className="mb-8">
+                        <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-2">Open Ticket</h3>
+                        <p className="text-zinc-500 text-xs font-medium">Fill out the form below and we&apos;ll get back to you.</p>
+                      </div>
+
+                      {submitError && (
+                        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-500 text-xs font-bold uppercase tracking-widest">
+                          <AlertCircle className="w-4 h-4" />
+                          {submitError}
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Name</label>
+                          <input 
+                            required
+                            type="text"
+                            value={formData.name}
+                            onChange={(e) => setFormData({...formData, name: e.target.value})}
+                            className="w-full bg-zinc-950/50 border border-white/5 rounded-xl px-4 py-3 text-xs font-medium text-white focus:outline-none focus:border-amber-500/30 transition-all"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Email</label>
+                          <input 
+                            required
+                            type="email"
+                            value={formData.email}
+                            onChange={(e) => setFormData({...formData, email: e.target.value})}
+                            className="w-full bg-zinc-950/50 border border-white/5 rounded-xl px-4 py-3 text-xs font-medium text-white focus:outline-none focus:border-amber-500/30 transition-all"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Subject</label>
+                        <input 
+                          required
+                          type="text"
+                          value={formData.subject}
+                          onChange={(e) => setFormData({...formData, subject: e.target.value})}
+                          className="w-full bg-zinc-950/50 border border-white/5 rounded-xl px-4 py-3 text-xs font-medium text-white focus:outline-none focus:border-amber-500/30 transition-all"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Message</label>
+                        <textarea 
+                          required
+                          value={formData.message}
+                          onChange={(e) => setFormData({...formData, message: e.target.value})}
+                          className="w-full h-32 bg-zinc-950/50 border border-white/5 rounded-xl px-4 py-3 text-xs font-medium text-white focus:outline-none focus:border-amber-500/30 transition-all resize-none"
+                        />
+                      </div>
+
+                      <Button 
+                        type="submit"
+                        variant="gold" 
+                        className="w-full h-14 rounded-xl text-[11px] font-black uppercase tracking-widest"
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send Message'}
+                      </Button>
+                    </form>
+                  )}
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
           {/* FAQ Section */}
-          <div className="space-y-12">
+          <div id="faq-section" className="space-y-12">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
               <div className="space-y-4">
                 <h2 className="text-4xl font-black text-zinc-100 tracking-tighter uppercase">Knowledge Base</h2>
@@ -162,7 +360,7 @@ export default function SupportPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-24">
               {FAQS.filter(f => f.cat === selectedCategory).map((faq, i) => (
                 <motion.div
                   key={i}
@@ -180,51 +378,6 @@ export default function SupportPage() {
                     </p>
                   </Card>
                 </motion.div>
-              ))}
-            </div>
-          </div>
-
-          {/* Active Tickets */}
-          <div className="space-y-12">
-            <div className="space-y-4">
-              <h2 className="text-4xl font-black text-zinc-100 tracking-tighter uppercase">Active Tickets</h2>
-              <div className="flex items-center space-x-4">
-                <div className="h-px w-12 bg-emerald-500" />
-                <span className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em]">Ticket Status</span>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {SUPPORT_TICKETS.map((ticket) => (
-                <Card key={ticket.id} className="premium-card p-8 group hover:border-zinc-700 transition-all">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div className="flex items-start space-x-6">
-                      <div className={cn(
-                        "w-12 h-12 rounded-xl flex items-center justify-center shrink-0",
-                        ticket.status === 'open' ? "bg-amber-500/10 text-amber-500" : "bg-emerald-500/10 text-emerald-500"
-                      )}>
-                        <LifeBuoy className="w-6 h-6" />
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center space-x-3">
-                          <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">#{ticket.id}</span>
-                          <Badge variant={ticket.status === 'open' ? 'warning' : 'success'} className="text-[8px] font-black uppercase tracking-widest">
-                            {ticket.status}
-                          </Badge>
-                        </div>
-                        <h4 className="text-lg font-black text-zinc-100 uppercase tracking-tight">{ticket.subject}</h4>
-                        <div className="flex items-center space-x-4 text-[9px] font-black text-zinc-500 uppercase tracking-widest">
-                          <span className="flex items-center"><Clock className="w-3 h-3 mr-1" /> {formatDate(ticket.createdAt)}</span>
-                          <span className="flex items-center"><MessageCircle className="w-3 h-3 mr-1" /> {ticket.category}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <Button variant="ghost" className="text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-zinc-100">
-                      View Details
-                      <ChevronRight className="w-4 h-4 ml-2" />
-                    </Button>
-                  </div>
-                </Card>
               ))}
             </div>
           </div>

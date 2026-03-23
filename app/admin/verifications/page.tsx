@@ -45,8 +45,9 @@ export default function AdminVerificationsPage() {
   const [loading, setLoading] = React.useState(true);
   const [isAdmin, setIsAdmin] = React.useState(false);
   const [processingId, setProcessingId] = React.useState<string | null>(null);
+  const [activeTab, setActiveTab] = React.useState<'pending' | 'approved' | 'rejected'>('pending');
 
-  const fetchVerifications = React.useCallback(async () => {
+  const fetchVerifications = React.useCallback(async (status: string) => {
     setLoading(true);
     const { data, error } = await supabase
       .from('seller_verifications')
@@ -57,8 +58,8 @@ export default function AdminVerificationsPage() {
           avatar_url
         )
       `)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: true });
+      .eq('status', status)
+      .order('created_at', { ascending: status === 'pending' });
 
     if (!error && data) {
       const verificationsWithSignedUrls = await Promise.all((data as any[]).map(async (v) => {
@@ -89,23 +90,11 @@ export default function AdminVerificationsPage() {
 
     if (user.email === 'skillerway100@gmail.com') {
       setIsAdmin(true);
-      fetchVerifications();
+      fetchVerifications(activeTab);
     } else {
-      // Check if user has 'admin' username in profile
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('username')
-        .eq('id', user.id)
-        .single();
-      
-      if (profile?.username === 'admin') {
-        setIsAdmin(true);
-        fetchVerifications();
-      } else {
-        router.push('/');
-      }
+      router.push('/');
     }
-  }, [router, fetchVerifications]);
+  }, [router, fetchVerifications, activeTab]);
 
   React.useEffect(() => {
     checkAdmin();
@@ -116,24 +105,27 @@ export default function AdminVerificationsPage() {
 
   const handleAction = async (id: string, status: 'approved' | 'rejected', reason?: string) => {
     setProcessingId(id);
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    const { error } = await supabase
-      .from('seller_verifications')
-      .update({ 
-        status, 
-        rejection_reason: reason,
-        reviewed_by: user?.id,
-        reviewed_at: new Date().toISOString()
-      })
-      .eq('id', id);
+    try {
+      const response = await fetch('/api/admin/verifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          verificationId: id, 
+          status, 
+          rejectionReason: reason 
+        })
+      });
 
-    if (!error) {
-      setVerifications(prev => prev.filter(v => v.id !== id));
+      if (!response.ok) throw new Error('Failed to update verification status');
+
+      fetchVerifications(activeTab);
       setRejectionId(null);
       setRejectionReason('');
+    } catch (err: any) {
+      console.error('Error handling verification action:', err);
+    } finally {
+      setProcessingId(null);
     }
-    setProcessingId(null);
   };
 
   if (!isAdmin) return null;
@@ -147,12 +139,29 @@ export default function AdminVerificationsPage() {
               <ShieldCheck className="w-8 h-8 mr-3 text-amber-500" />
               Seller Verifications
             </h1>
-            <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.3em]">Review pending seller applications</p>
+            <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.3em]">Review seller applications</p>
           </div>
-          <Button variant="ghost" onClick={() => router.push('/sell')} className="text-zinc-500 hover:text-zinc-100">
-            <ChevronLeft className="w-4 h-4 mr-2" />
-            Back to Sell
-          </Button>
+          <div className="flex items-center gap-4">
+            <div className="flex bg-zinc-900/50 p-1 rounded-xl border border-white/5">
+              {(['pending', 'approved', 'rejected'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                    activeTab === tab 
+                      ? "bg-amber-500 text-black" 
+                      : "text-zinc-500 hover:text-zinc-300"
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+            <Button variant="ghost" onClick={() => router.push('/sell')} className="text-zinc-500 hover:text-zinc-100">
+              <ChevronLeft className="w-4 h-4 mr-2" />
+              Back to Sell
+            </Button>
+          </div>
         </div>
 
         {loading ? (

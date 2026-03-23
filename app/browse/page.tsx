@@ -2,211 +2,58 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import {
-  Search,
-  SlidersHorizontal,
-  LayoutGrid,
-  List,
-  X,
-  Loader2,
-  ShieldCheck,
-  Star,
-  Zap,
-} from 'lucide-react';
+import { Search, Filter, SlidersHorizontal, Zap, Star, ChevronDown, LayoutGrid, List, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
+import { motion, AnimatePresence } from 'motion/react';
 import { GAMES, CATEGORIES } from '@/data/mock';
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency, cn, getListingSection } from '@/lib/utils';
+import { GameId, CategoryId, SectionId } from '@/types';
 import { SECTION_TO_CATEGORY, NAV_SECTIONS } from '@/data/navigation';
+import { AccountFilters } from '@/components/browse/AccountFilters';
+import { AccountListingCard } from '@/components/browse/AccountListingCard';
 import { BoostingSection } from '@/components/boosting/BoostingSection';
+import { ListingCard } from '@/components/ListingCard';
 import { supabase } from '@/lib/supabase';
-
-type SellerProfile = {
-  id: string;
-  username: string | null;
-  avatar_url: string | null;
-  is_verified_seller: boolean | null;
-  average_rating: number | null;
-  review_count: number | null;
-};
-
-type ListingRow = {
-  id: string;
-  title: string;
-  description: string | null;
-  price: number;
-  game: string;
-  category: string;
-  seller_id: string;
-  created_at?: string;
-  status?: string;
-  seller?: {
-    id: string;
-    username: string;
-    avatar: string;
-    isVerified: boolean;
-    rating: number;
-    totalSales: number;
-  };
-  gameId?: string;
-  categoryId?: string;
-  sellerId?: string;
-  deliveryTime?: string;
-  deliveryMethod?: string;
-};
-
-function ListingCardItem({
-  listing,
-  viewMode,
-}: {
-  listing: ListingRow;
-  viewMode: 'grid' | 'list';
-}) {
-  if (viewMode === 'list') {
-    return (
-      <Link href={`/listing/${listing.id}`} className="block">
-        <Card className="group border border-zinc-800/60 bg-zinc-950/70 backdrop-blur hover:border-amber-500/40 transition-all duration-300">
-          <CardContent className="p-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="min-w-0 flex-1">
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                    {listing.game}
-                  </Badge>
-                  <Badge className="bg-zinc-900 text-zinc-300 border border-zinc-800">
-                    {listing.category}
-                  </Badge>
-                  {listing.seller?.isVerified && (
-                    <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                      Verified Seller
-                    </Badge>
-                  )}
-                </div>
-
-                <h3 className="text-lg font-bold text-white group-hover:text-amber-400 transition-colors">
-                  {listing.title}
-                </h3>
-
-                <p className="mt-2 line-clamp-2 text-sm text-zinc-400">
-                  {listing.description || 'Premium marketplace listing.'}
-                </p>
-
-                <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-zinc-500">
-                  <div className="flex items-center gap-1">
-                    <ShieldCheck className="h-4 w-4" />
-                    <span>{listing.seller?.username || 'Unknown seller'}</span>
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    <Star className="h-4 w-4" />
-                    <span>{listing.seller?.rating?.toFixed(1) || '0.0'} rating</span>
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    <Zap className="h-4 w-4" />
-                    <span>{listing.deliveryTime || 'Instant Delivery'}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex shrink-0 items-center justify-between gap-4 lg:flex-col lg:items-end">
-                <div className="text-right">
-                  <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">Price</p>
-                  <p className="text-2xl font-black text-amber-400">
-                    {formatCurrency(Number(listing.price || 0))}
-                  </p>
-                </div>
-
-                <Button className="bg-amber-500 text-black hover:bg-amber-400">
-                  View Listing
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </Link>
-    );
-  }
-
-  return (
-    <Link href={`/listing/${listing.id}`} className="block h-full">
-      <Card className="group h-full border border-zinc-800/60 bg-zinc-950/70 backdrop-blur hover:border-amber-500/40 transition-all duration-300">
-        <CardContent className="flex h-full flex-col p-5">
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/20">
-              {listing.game}
-            </Badge>
-            <Badge className="bg-zinc-900 text-zinc-300 border border-zinc-800">
-              {listing.category}
-            </Badge>
-          </div>
-
-          <h3 className="line-clamp-2 text-lg font-bold text-white group-hover:text-amber-400 transition-colors">
-            {listing.title}
-          </h3>
-
-          <p className="mt-3 line-clamp-3 flex-1 text-sm text-zinc-400">
-            {listing.description || 'Premium marketplace listing.'}
-          </p>
-
-          <div className="mt-4 flex items-center justify-between text-xs text-zinc-500">
-            <div className="flex items-center gap-1">
-              <ShieldCheck className="h-4 w-4" />
-              <span className="truncate max-w-[120px]">
-                {listing.seller?.username || 'Unknown seller'}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1">
-              <Star className="h-4 w-4" />
-              <span>{listing.seller?.rating?.toFixed(1) || '0.0'}</span>
-            </div>
-          </div>
-
-          <div className="mt-5 flex items-end justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">Price</p>
-              <p className="text-2xl font-black text-amber-400">
-                {formatCurrency(Number(listing.price || 0))}
-              </p>
-            </div>
-
-            <Button className="bg-amber-500 text-black hover:bg-amber-400">
-              View
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
-  );
-}
 
 function BrowseContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-
   const sectionParam = searchParams.get('section');
   const gameParam = searchParams.get('game');
   const categoryParam = searchParams.get('category');
 
-  const [listings, setListings] = React.useState<ListingRow[]>([]);
+  const [listings, setListings] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [searchQuery, setSearchQuery] = React.useState('');
-  const [selectedGame, setSelectedGame] = React.useState('all');
-  const [selectedCategory, setSelectedCategory] = React.useState('all');
+  const [selectedGame, setSelectedGame] = React.useState<GameId | 'all'>('all');
+  const [selectedCategory, setSelectedCategory] = React.useState<CategoryId | 'all'>('all');
   const [isFilterOpen, setIsFilterOpen] = React.useState(false);
   const [viewMode, setViewMode] = React.useState<'grid' | 'list'>('grid');
+  
+  const [accountFilters, setAccountFilters] = React.useState({
+    search: '',
+    minPrice: '',
+    maxPrice: '',
+    build: '',
+    type: '',
+    loginMethod: '',
+    totalLevel: '',
+  });
 
+  // Sync state with URL parameters and normalize legacy params
   React.useEffect(() => {
     let currentSection = sectionParam;
-    const currentGame = gameParam;
-    const currentCategory = categoryParam;
+    let currentGame = gameParam;
+    let currentCategory = categoryParam;
 
+    // Legacy mapping
     const legacyMapping: Record<string, string> = {
       gold: 'currency',
       items: 'items',
@@ -224,279 +71,267 @@ function BrowseContent() {
     }
 
     if (currentGame) {
-      const game = GAMES.find(
-        (g: any) => g.id.toLowerCase() === currentGame.toLowerCase()
-      );
-      setSelectedGame(game ? game.id : 'all');
+      const game = GAMES.find(g => g.id.toLowerCase() === currentGame?.toLowerCase());
+      if (game) setSelectedGame(game.id as GameId);
+      else setSelectedGame('all');
     } else {
       setSelectedGame('all');
     }
 
     if (currentSection) {
-      const mappedCategory = SECTION_TO_CATEGORY[currentSection.toLowerCase()];
-      setSelectedCategory(mappedCategory || 'all');
+      const categoryId = SECTION_TO_CATEGORY[currentSection.toLowerCase()];
+      if (categoryId) setSelectedCategory(categoryId as CategoryId);
+      else setSelectedCategory('all');
     } else {
       setSelectedCategory('all');
     }
   }, [sectionParam, gameParam, categoryParam, searchParams, pathname, router]);
 
+  // Fetch real listings from Supabase
   React.useEffect(() => {
     const fetchListings = async () => {
       setLoading(true);
-      setError(null);
-
       try {
-        let query = supabase.from('listings').select('*').eq('status', 'active');
+        let query = supabase
+          .from('listings')
+          .select(`
+            *,
+            seller:profiles!listings_seller_id_fkey (
+              username,
+              avatar_url,
+              is_verified_seller,
+              average_rating,
+              review_count
+            )
+          `)
+          .eq('status', 'active');
 
         if (selectedGame !== 'all') {
           query = query.eq('game', selectedGame);
         }
 
         if (sectionParam) {
-          const mappedCategory = SECTION_TO_CATEGORY[sectionParam.toLowerCase()];
-          if (mappedCategory) {
-            query = query.eq('category', mappedCategory);
+          const categoryId = SECTION_TO_CATEGORY[sectionParam.toLowerCase()];
+          if (categoryId) {
+            query = query.eq('category', categoryId);
           }
         } else if (selectedCategory !== 'all') {
           query = query.eq('category', selectedCategory);
         }
 
-        if (searchQuery.trim()) {
-          query = query.ilike('title', `%${searchQuery.trim()}%`);
+        if (searchQuery) {
+          query = query.ilike('title', `%${searchQuery}%`);
         }
 
-        const { data, error: fetchError } = await query.order('created_at', {
-          ascending: false,
-        });
+        const { data, error: fetchError } = await query.order('created_at', { ascending: false });
 
         if (fetchError) throw fetchError;
+        
+        // Transform data to match the expected Listing type if necessary
+        const transformedData = data?.map((item: any) => ({
+          ...item,
+          gameId: item.game,
+          categoryId: item.category,
+          sellerId: item.seller_id,
+          deliveryTime: 'Instant Delivery', // Default or from DB if added
+          deliveryMethod: 'In-game Trade', // Default or from DB if added
+          seller: {
+            id: item.seller_id,
+            username: item.seller?.username || 'Unknown',
+            avatar: item.seller?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.seller_id}`,
+            isVerified: item.seller?.is_verified_seller || false,
+            rating: item.seller?.average_rating || 0,
+            totalSales: item.seller?.review_count || 0,
+          }
+        }));
 
-        const sellerIds = [
-          ...new Set(
-            (data || [])
-              .map((item: any) => item.seller_id)
-              .filter(Boolean)
-          ),
-        ] as string[];
-
-        let profilesMap = new Map<string, SellerProfile>();
-
-        if (sellerIds.length > 0) {
-          const { data: profilesData, error: profilesError } = await supabase
-            .from('profiles')
-            .select(
-              'id, username, avatar_url, is_verified_seller, average_rating, review_count'
-            )
-            .in('id', sellerIds);
-
-          if (profilesError) throw profilesError;
-
-          profilesMap = new Map(
-            ((profilesData || []) as SellerProfile[]).map((profile) => [
-              profile.id,
-              profile,
-            ])
-          );
-        }
-
-        const transformedData: ListingRow[] = (data || []).map((item: any) => {
-          const sellerProfile = profilesMap.get(item.seller_id);
-
-          return {
-            ...item,
-            gameId: item.game,
-            categoryId: item.category,
-            sellerId: item.seller_id,
-            deliveryTime: 'Instant Delivery',
-            deliveryMethod: 'In-game Trade',
-            seller: {
-              id: item.seller_id,
-              username: sellerProfile?.username || 'Unknown',
-              avatar:
-                sellerProfile?.avatar_url ||
-                `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.seller_id}`,
-              isVerified: sellerProfile?.is_verified_seller || false,
-              rating: Number(sellerProfile?.average_rating || 0),
-              totalSales: Number(sellerProfile?.review_count || 0),
-            },
-          };
-        });
-
-        setListings(transformedData);
+        setListings(transformedData || []);
       } catch (err: any) {
         console.error('Error fetching listings:', err);
-        setError(err?.message || 'Failed to fetch listings');
-        setListings([]);
+        setError(err.message);
       } finally {
         setLoading(false);
       }
     };
 
-    const isBoostingSection =
-      selectedCategory === 'services' || sectionParam?.toLowerCase() === 'boosting';
-
-    if (!isBoostingSection) {
-      fetchListings();
-    } else {
-      setLoading(false);
-      setError(null);
-    }
+    fetchListings();
   }, [selectedGame, selectedCategory, sectionParam, searchQuery]);
 
   const updateUrl = (params: Record<string, string | null>) => {
     const newParams = new URLSearchParams(searchParams.toString());
-
     Object.entries(params).forEach(([key, value]) => {
-      if (!value || value === 'all') {
+      if (value === null || value === 'all') {
         newParams.delete(key);
       } else {
         newParams.set(key, value);
       }
     });
-
     router.push(`${pathname}?${newParams.toString()}`);
   };
 
   const handleGameSelect = (gameId: string) => {
-    updateUrl({ game: gameId === 'all' ? null : gameId });
+    updateUrl({ game: gameId });
     if (isFilterOpen) setIsFilterOpen(false);
   };
 
   const handleCategorySelect = (categoryId: string) => {
+    // Map category back to section for strict section behavior
     const sectionId = Object.keys(SECTION_TO_CATEGORY).find(
-      (key) => SECTION_TO_CATEGORY[key] === categoryId
+      key => SECTION_TO_CATEGORY[key] === categoryId
     );
-
-    updateUrl({ section: sectionId || null, category: null });
-
+    
+    if (sectionId) {
+      updateUrl({ section: sectionId });
+    } else {
+      updateUrl({ section: null });
+    }
+    
     if (isFilterOpen) setIsFilterOpen(false);
   };
 
-  const currentSectionName =
-    NAV_SECTIONS.find((s: any) => s.id === sectionParam?.toLowerCase())?.name ||
-    'Marketplace';
+  const isAccountSection = selectedCategory === 'accounts' || sectionParam?.toLowerCase() === 'accounts';
+  const isBoostingSection = selectedCategory === 'services' || sectionParam?.toLowerCase() === 'boosting';
 
-  const isBoostingSection =
-    selectedCategory === 'services' || sectionParam?.toLowerCase() === 'boosting';
+  const clearAccountFilters = () => {
+    setAccountFilters({
+      search: '',
+      minPrice: '',
+      maxPrice: '',
+      build: '',
+      type: '',
+      loginMethod: '',
+      totalLevel: '',
+    });
+  };
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-white">
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-8 rounded-3xl border border-zinc-800/60 bg-gradient-to-br from-zinc-950 to-zinc-900 p-6">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+    <div className="pt-32 pb-32 bg-zinc-950 min-h-screen relative overflow-hidden">
+      {/* Background Glows */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-amber-500/5 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-zinc-100/5 rounded-full blur-[120px]" />
+      </div>
+
+      <div className="container mx-auto px-6 relative z-10">
+        <div className="flex flex-col space-y-12">
+          {/* Header */}
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.35em] text-amber-400">
-                The Exchange
+              <div className="flex items-center space-x-2 text-amber-500 text-[10px] font-black uppercase tracking-[0.4em] mb-4">
+                <span>The Exchange</span>
                 {(sectionParam || gameParam) && (
                   <>
-                    {' / '}
-                    {sectionParam
-                      ? NAV_SECTIONS.find((s: any) => s.id === sectionParam.toLowerCase())
-                          ?.name || 'All'
-                      : 'All'}
-                    {gameParam && <> / {gameParam.toUpperCase()}</>}
+                    <span className="text-zinc-800">/</span>
+                    <span className="text-zinc-400">
+                      {sectionParam ? NAV_SECTIONS.find(s => s.id === sectionParam.toLowerCase())?.name : 'All'}
+                    </span>
+                    {gameParam && (
+                      <>
+                        <span className="text-zinc-800">/</span>
+                        <span className="text-amber-500">{gameParam.toUpperCase()}</span>
+                      </>
+                    )}
                   </>
                 )}
-              </p>
-
-              <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">
-                {currentSectionName}
+              </div>
+              <h1 className="text-6xl font-black text-zinc-100 tracking-tighter uppercase leading-none">
+                {sectionParam ? NAV_SECTIONS.find(s => s.id === sectionParam.toLowerCase())?.name : 'Marketplace'}
               </h1>
-
-              <p className="mt-3 max-w-2xl text-sm text-zinc-400 sm:text-base">
-                Browse premium listings, compare verified sellers, and buy safely
-                through RSPlatform.
-              </p>
             </div>
-
-            <div className="flex items-center gap-2 self-start lg:self-auto">
-              <button
-                type="button"
-                onClick={() => setViewMode('grid')}
-                className={cn(
-                  'rounded-xl p-2 transition-all',
-                  viewMode === 'grid'
-                    ? 'bg-amber-500 text-black'
-                    : 'bg-zinc-900 text-zinc-400 hover:text-white'
-                )}
+            <div className="flex items-center space-x-4">
+              <div className="flex bg-zinc-900/50 p-1 rounded-xl border border-white/5">
+                <button 
+                  onClick={() => setViewMode('grid')}
+                  className={cn(
+                    "p-2 rounded-lg transition-all",
+                    viewMode === 'grid' ? "bg-amber-500 text-zinc-950" : "text-zinc-500 hover:text-zinc-300"
+                  )}
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+                <button 
+                  onClick={() => setViewMode('list')}
+                  className={cn(
+                    "p-2 rounded-lg transition-all",
+                    viewMode === 'list' ? "bg-amber-500 text-zinc-950" : "text-zinc-500 hover:text-zinc-300"
+                  )}
+                >
+                  <List className="w-4 h-4" />
+                </button>
+              </div>
+              <Button 
+                variant="secondary" 
+                className="md:hidden rounded-xl border border-white/5 bg-zinc-900/50"
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
               >
-                <LayoutGrid className="h-5 w-5" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setViewMode('list')}
-                className={cn(
-                  'rounded-xl p-2 transition-all',
-                  viewMode === 'list'
-                    ? 'bg-amber-500 text-black'
-                    : 'bg-zinc-900 text-zinc-400 hover:text-white'
-                )}
-              >
-                <List className="h-5 w-5" />
-              </button>
-
-              <Button
-                onClick={() => setIsFilterOpen(true)}
-                className="bg-zinc-900 text-white hover:bg-zinc-800 lg:hidden"
-              >
-                <SlidersHorizontal className="mr-2 h-4 w-4" />
+                <SlidersHorizontal className="w-4 h-4 mr-2" />
                 Filters
               </Button>
             </div>
           </div>
-        </div>
 
-        {isBoostingSection ? (
-          <BoostingSection />
-        ) : (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
-            <aside className="hidden lg:block">
-              <Card className="border border-zinc-800/60 bg-zinc-950/70">
-                <CardContent className="space-y-6 p-5">
+          {/* Account Specific Filters (Full Width) */}
+          {isAccountSection && (
+            <motion.div 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-zinc-900/30 backdrop-blur-md border border-zinc-800/50 rounded-3xl p-8"
+            >
+              <AccountFilters 
+                filters={accountFilters} 
+                setFilters={setAccountFilters} 
+                onClear={clearAccountFilters} 
+              />
+            </motion.div>
+          )}
+
+          {/* Boosting Section */}
+          {isBoostingSection ? (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <BoostingSection />
+            </motion.div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* Sidebar Filters - Hidden for accounts as they have top filters */}
+            {!isAccountSection && (
+              <aside className="hidden lg:block lg:col-span-3 space-y-10 sticky top-32">
+                <div className="space-y-8">
                   <div>
-                    <p className="mb-3 text-xs font-black uppercase tracking-[0.25em] text-zinc-500">
-                      Search
-                    </p>
+                    <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em] mb-6">Search</h3>
                     <div className="relative">
-                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-                      <Input
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
+                      <Input 
+                        placeholder="Search marketplace..." 
+                        className="pl-12 bg-zinc-900/30 border-zinc-800/50"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search listings..."
-                        className="border-zinc-800 bg-zinc-900/80 pl-10 text-white placeholder:text-zinc-500"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <p className="mb-3 text-xs font-black uppercase tracking-[0.25em] text-zinc-500">
-                      Game
-                    </p>
+                    <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em] mb-6">Game Selection</h3>
                     <div className="space-y-2">
-                      <button
-                        type="button"
+                      <button 
                         onClick={() => handleGameSelect('all')}
                         className={cn(
-                          'w-full rounded-xl border px-4 py-3 text-left text-[11px] font-black uppercase tracking-widest transition-all',
-                          selectedGame === 'all'
-                            ? 'border-amber-500/50 bg-amber-500/10 text-amber-400'
-                            : 'border-zinc-800 bg-zinc-900/40 text-zinc-400 hover:border-zinc-700'
+                          "w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all text-[11px] font-black uppercase tracking-widest",
+                          selectedGame === 'all' ? "bg-amber-500/10 border-amber-500/50 text-amber-500" : "bg-zinc-900/30 border-zinc-800/50 text-zinc-500 hover:border-zinc-700"
                         )}
                       >
                         All Games
                       </button>
-
                       {GAMES.map((game: any) => (
-                        <button
+                        <button 
                           key={game.id}
-                          type="button"
                           onClick={() => handleGameSelect(game.id)}
                           className={cn(
-                            'w-full rounded-xl border px-4 py-3 text-left text-[11px] font-black uppercase tracking-widest transition-all',
-                            selectedGame === game.id
-                              ? 'border-amber-500/50 bg-amber-500/10 text-amber-400'
-                              : 'border-zinc-800 bg-zinc-900/40 text-zinc-400 hover:border-zinc-700'
+                            "w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all text-[11px] font-black uppercase tracking-widest",
+                            selectedGame === game.id ? "bg-amber-500/10 border-amber-500/50 text-amber-500" : "bg-zinc-900/30 border-zinc-800/50 text-zinc-500 hover:border-zinc-700"
                           )}
                         >
                           {game.name}
@@ -506,33 +341,24 @@ function BrowseContent() {
                   </div>
 
                   <div>
-                    <p className="mb-3 text-xs font-black uppercase tracking-[0.25em] text-zinc-500">
-                      Category
-                    </p>
+                    <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em] mb-6">Asset Category</h3>
                     <div className="space-y-2">
-                      <button
-                        type="button"
-                        onClick={() => updateUrl({ section: null, category: null })}
+                      <button 
+                        onClick={() => handleCategorySelect('all')}
                         className={cn(
-                          'w-full rounded-xl border px-4 py-3 text-left text-[11px] font-black uppercase tracking-widest transition-all',
-                          selectedCategory === 'all'
-                            ? 'border-amber-500/50 bg-amber-500/10 text-amber-400'
-                            : 'border-zinc-800 bg-zinc-900/40 text-zinc-400 hover:border-zinc-700'
+                          "w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all text-[11px] font-black uppercase tracking-widest",
+                          selectedCategory === 'all' ? "bg-amber-500/10 border-amber-500/50 text-amber-500" : "bg-zinc-900/30 border-zinc-800/50 text-zinc-500 hover:border-zinc-700"
                         )}
                       >
                         All Categories
                       </button>
-
                       {CATEGORIES.map((cat: any) => (
-                        <button
+                        <button 
                           key={cat.id}
-                          type="button"
                           onClick={() => handleCategorySelect(cat.id)}
                           className={cn(
-                            'w-full rounded-xl border px-4 py-3 text-left text-[11px] font-black uppercase tracking-widest transition-all',
-                            selectedCategory === cat.id
-                              ? 'border-amber-500/50 bg-amber-500/10 text-amber-400'
-                              : 'border-zinc-800 bg-zinc-900/40 text-zinc-400 hover:border-zinc-700'
+                            "w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all text-[11px] font-black uppercase tracking-widest",
+                            selectedCategory === cat.id ? "bg-amber-500/10 border-amber-500/50 text-amber-500" : "bg-zinc-900/30 border-zinc-800/50 text-zinc-500 hover:border-zinc-700"
                           )}
                         >
                           {cat.name}
@@ -540,192 +366,229 @@ function BrowseContent() {
                       ))}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            </aside>
+                </div>
+              </aside>
+            )}
 
-            <section>
-              {error && (
-                <Card className="mb-5 border border-red-500/30 bg-red-500/10">
-                  <CardContent className="p-4 text-sm text-red-300">
-                    Failed to load listings: {error}
-                  </CardContent>
-                </Card>
-              )}
-
-              {loading ? (
-                <Card className="border border-zinc-800/60 bg-zinc-950/70">
-                  <CardContent className="flex items-center justify-center gap-3 p-10 text-zinc-400">
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    <span>Scanning inventory...</span>
-                  </CardContent>
-                </Card>
-              ) : listings.length === 0 ? (
-                <Card className="border border-zinc-800/60 bg-zinc-950/70">
-                  <CardContent className="p-10 text-center">
-                    <h3 className="text-xl font-bold text-white">No Inventory Found</h3>
-                    <p className="mt-2 text-sm text-zinc-400">
-                      Adjust your search parameters or filters.
-                    </p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div
-                  className={cn(
-                    viewMode === 'grid'
-                      ? 'grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3'
-                      : 'space-y-4'
-                  )}
-                >
-                  {listings.map((listing) => (
-                    <ListingCardItem
+            {/* Listings Grid */}
+            <div className={cn(isAccountSection ? "lg:col-span-12" : "lg:col-span-9")}>
+              <div className={cn(
+                "grid gap-8",
+                isAccountSection 
+                  ? "grid-cols-1" 
+                  : viewMode === 'grid' 
+                    ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" 
+                    : "grid-cols-1"
+              )}>
+                <AnimatePresence mode="popLayout">
+                  {loading ? (
+                    <div className="lg:col-span-full py-32 flex flex-col items-center justify-center space-y-4">
+                      <Loader2 className="w-12 h-12 text-amber-500 animate-spin" />
+                      <p className="text-zinc-500 font-black uppercase tracking-widest text-xs">Scanning Inventory...</p>
+                    </div>
+                  ) : listings.map((listing: any, i: number) => (
+                    <motion.div
                       key={listing.id}
-                      listing={listing}
-                      viewMode={viewMode}
-                    />
+                      layout
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      transition={{ duration: 0.3, delay: i * 0.05 }}
+                    >
+                      {isAccountSection ? (
+                        <AccountListingCard listing={listing} />
+                      ) : viewMode === 'list' ? (
+                        <Link href={`/listing/${listing.id}`}>
+                          <Card className="premium-card group overflow-hidden hover:border-amber-500/30 transition-all duration-300">
+                            <div className="flex flex-col sm:flex-row h-full">
+                              <div className="w-full sm:w-48 h-48 sm:h-auto relative overflow-hidden shrink-0">
+                                <Image 
+                                  src={listing.images[0]} 
+                                  alt={listing.title} 
+                                  fill
+                                  className="object-cover transition-transform duration-700 group-hover:scale-110"
+                                  referrerPolicy="no-referrer"
+                                />
+                                <div className="absolute top-3 left-3">
+                                  <Badge variant="gold" className="text-[8px] font-black uppercase tracking-widest">
+                                    {listing.gameId}
+                                  </Badge>
+                                </div>
+                              </div>
+                              <CardContent className="p-6 flex flex-col justify-between flex-grow">
+                                <div>
+                                  <div className="flex justify-between items-start mb-2">
+                                    <h3 className="text-lg font-black text-zinc-100 tracking-tight uppercase group-hover:text-amber-500 transition-colors line-clamp-1">
+                                      {listing.title}
+                                    </h3>
+                                  </div>
+                                  <p className="text-zinc-500 text-xs line-clamp-2 mb-4 font-medium leading-relaxed">
+                                    {listing.description}
+                                  </p>
+                                  <div className="flex items-center space-x-4">
+                                    <div className="flex items-center text-emerald-500 text-[9px] font-black uppercase tracking-widest">
+                                      <Zap className="w-3 h-3 mr-1" />
+                                      {listing.deliveryTime}
+                                    </div>
+                                    <div className="w-1 h-1 bg-zinc-800 rounded-full" />
+                                    <div className="text-zinc-500 text-[9px] font-black uppercase tracking-widest">
+                                      {listing.deliveryMethod}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center justify-between pt-4 mt-4 border-t border-white/5">
+                                  <div className="text-xl font-black text-zinc-100 tracking-tighter">
+                                    {formatCurrency(listing.price)}
+                                  </div>
+                                  <Button variant="ghost" size="sm" className="rounded-xl border border-white/5 text-[9px] font-black uppercase tracking-widest group-hover:bg-amber-500 group-hover:text-zinc-950 transition-all">
+                                    Buy Now
+                                  </Button>
+                                </div>
+                              </CardContent>
+                            </div>
+                          </Card>
+                        </Link>
+                      ) : (
+                        <ListingCard listing={listing} index={i} />
+                      )}
+                    </motion.div>
                   ))}
+                </AnimatePresence>
+              </div>
+
+              {!loading && listings.length === 0 && (
+                <div className="py-32 text-center">
+                  <div className="w-20 h-20 bg-zinc-900 border border-zinc-800 rounded-3xl flex items-center justify-center mx-auto mb-8">
+                    <Search className="w-8 h-8 text-zinc-700" />
+                  </div>
+                  <h3 className="text-2xl font-black text-zinc-100 uppercase tracking-tight mb-4">No Inventory Found</h3>
+                  <p className="text-zinc-500 text-sm font-medium uppercase tracking-widest">Adjust your search parameters or filters.</p>
                 </div>
               )}
-            </section>
+            </div>
           </div>
         )}
+        </div>
       </div>
 
-      {isFilterOpen && (
-        <>
-          <button
-            type="button"
-            onClick={() => setIsFilterOpen(false)}
-            className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm lg:hidden"
-          />
-
-          <div className="fixed inset-x-0 bottom-0 z-[101] max-h-[85vh] rounded-t-3xl border-t border-zinc-800 bg-zinc-950 p-5 lg:hidden">
-            <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-lg font-black">Filters</h2>
-              <button
-                type="button"
-                onClick={() => setIsFilterOpen(false)}
-                className="rounded-xl bg-zinc-900 p-2 text-zinc-400 hover:text-white"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="space-y-5 overflow-y-auto pb-4">
-              <div>
-                <p className="mb-3 text-xs font-black uppercase tracking-[0.25em] text-zinc-500">
-                  Search
-                </p>
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-                  <Input
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search listings..."
-                    className="border-zinc-800 bg-zinc-900/80 pl-10 text-white placeholder:text-zinc-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <p className="mb-3 text-xs font-black uppercase tracking-[0.25em] text-zinc-500">
-                  Game
-                </p>
-                <div className="space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => handleGameSelect('all')}
-                    className={cn(
-                      'w-full rounded-xl border px-4 py-3 text-left text-[11px] font-black uppercase tracking-widest transition-all',
-                      selectedGame === 'all'
-                        ? 'border-amber-500/50 bg-amber-500/10 text-amber-400'
-                        : 'border-zinc-800 bg-zinc-900/40 text-zinc-400 hover:border-zinc-700'
-                    )}
+      {/* Mobile Filters Drawer */}
+      <AnimatePresence>
+        {isFilterOpen && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsFilterOpen(false)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] lg:hidden"
+            />
+            <motion.div 
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed right-0 top-0 bottom-0 w-[85%] max-w-sm bg-zinc-950 border-l border-white/10 z-[101] lg:hidden overflow-y-auto"
+            >
+              <div className="p-8 space-y-10">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-black text-white uppercase tracking-tight">Filters</h2>
+                  <button 
+                    onClick={() => setIsFilterOpen(false)}
+                    className="p-2 bg-zinc-900 rounded-xl text-zinc-400 hover:text-white transition-colors"
                   >
-                    All Games
+                    <X className="w-5 h-5" />
                   </button>
-
-                  {GAMES.map((game: any) => (
-                    <button
-                      key={game.id}
-                      type="button"
-                      onClick={() => handleGameSelect(game.id)}
-                      className={cn(
-                        'w-full rounded-xl border px-4 py-3 text-left text-[11px] font-black uppercase tracking-widest transition-all',
-                        selectedGame === game.id
-                          ? 'border-amber-500/50 bg-amber-500/10 text-amber-400'
-                          : 'border-zinc-800 bg-zinc-900/40 text-zinc-400 hover:border-zinc-700'
-                      )}
-                    >
-                      {game.name}
-                    </button>
-                  ))}
                 </div>
-              </div>
 
-              <div>
-                <p className="mb-3 text-xs font-black uppercase tracking-[0.25em] text-zinc-500">
-                  Category
-                </p>
-                <div className="space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => updateUrl({ section: null, category: null })}
-                    className={cn(
-                      'w-full rounded-xl border px-4 py-3 text-left text-[11px] font-black uppercase tracking-widest transition-all',
-                      selectedCategory === 'all'
-                        ? 'border-amber-500/50 bg-amber-500/10 text-amber-400'
-                        : 'border-zinc-800 bg-zinc-900/40 text-zinc-400 hover:border-zinc-700'
-                    )}
+                <div className="space-y-8">
+                  <div>
+                    <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em] mb-6">Search</h3>
+                    <div className="relative">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
+                      <Input 
+                        placeholder="Search marketplace..." 
+                        className="pl-12 bg-zinc-900/30 border-zinc-800/50"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em] mb-6">Game Selection</h3>
+                    <div className="space-y-2">
+                      <button 
+                        onClick={() => handleGameSelect('all')}
+                        className={cn(
+                          "w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all text-[11px] font-black uppercase tracking-widest",
+                          selectedGame === 'all' ? "bg-amber-500/10 border-amber-500/50 text-amber-500" : "bg-zinc-900/30 border-zinc-800/50 text-zinc-500 hover:border-zinc-700"
+                        )}
+                      >
+                        All Games
+                      </button>
+                      {GAMES.map((game: any) => (
+                        <button 
+                          key={game.id}
+                          onClick={() => handleGameSelect(game.id)}
+                          className={cn(
+                            "w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all text-[11px] font-black uppercase tracking-widest",
+                            selectedGame === game.id ? "bg-amber-500/10 border-amber-500/50 text-amber-500" : "bg-zinc-900/30 border-zinc-800/50 text-zinc-500 hover:border-zinc-700"
+                          )}
+                        >
+                          {game.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em] mb-6">Asset Category</h3>
+                    <div className="space-y-2">
+                      <button 
+                        onClick={() => handleCategorySelect('all')}
+                        className={cn(
+                          "w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all text-[11px] font-black uppercase tracking-widest",
+                          selectedCategory === 'all' ? "bg-amber-500/10 border-amber-500/50 text-amber-500" : "bg-zinc-900/30 border-zinc-800/50 text-zinc-500 hover:border-zinc-700"
+                        )}
+                      >
+                        All Categories
+                      </button>
+                      {CATEGORIES.map((cat: any) => (
+                        <button 
+                          key={cat.id}
+                          onClick={() => handleCategorySelect(cat.id)}
+                          className={cn(
+                            "w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all text-[11px] font-black uppercase tracking-widest",
+                            selectedCategory === cat.id ? "bg-amber-500/10 border-amber-500/50 text-amber-500" : "bg-zinc-900/30 border-zinc-800/50 text-zinc-500 hover:border-zinc-700"
+                          )}
+                        >
+                          {cat.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-8">
+                  <Button 
+                    className="w-full rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-black uppercase tracking-widest py-6"
+                    onClick={() => setIsFilterOpen(false)}
                   >
-                    All Categories
-                  </button>
-
-                  {CATEGORIES.map((cat: any) => (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => handleCategorySelect(cat.id)}
-                      className={cn(
-                        'w-full rounded-xl border px-4 py-3 text-left text-[11px] font-black uppercase tracking-widest transition-all',
-                        selectedCategory === cat.id
-                          ? 'border-amber-500/50 bg-amber-500/10 text-amber-400'
-                          : 'border-zinc-800 bg-zinc-900/40 text-zinc-400 hover:border-zinc-700'
-                      )}
-                    >
-                      {cat.name}
-                    </button>
-                  ))}
+                    Show Results
+                  </Button>
                 </div>
               </div>
-
-              <Button
-                onClick={() => setIsFilterOpen(false)}
-                className="w-full bg-amber-500 text-black hover:bg-amber-400"
-              >
-                Show Results
-              </Button>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function BrowsePageFallback() {
-  return (
-    <div className="min-h-screen bg-[#09090b] text-white">
-      <div className="mx-auto flex max-w-7xl items-center justify-center px-4 py-24">
-        <div className="text-zinc-400">Loading marketplace...</div>
-      </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
 export default function BrowsePage() {
   return (
-    <React.Suspense fallback={<BrowsePageFallback />}>
+    <React.Suspense fallback={<div className="min-h-screen bg-zinc-950 flex items-center justify-center"><div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" /></div>}>
       <BrowseContent />
     </React.Suspense>
   );

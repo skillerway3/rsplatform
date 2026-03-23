@@ -8,6 +8,7 @@ import { Zap, ShieldCheck, Clock, ArrowRight, Loader2, AlertCircle, CheckCircle2
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { createNotification } from '@/lib/notifications';
 
 export default function SubmitRequestPage() {
   const { user, loading: authLoading } = useAuth();
@@ -74,6 +75,30 @@ export default function SubmitRequestPage() {
 
       setSuccess(true);
       
+      // Notify all verified sellers about the new request
+      try {
+        const { data: sellers } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('is_verified_seller', true);
+
+        if (sellers && sellers.length > 0) {
+          const notificationPromises = sellers.map(seller => 
+            createNotification({
+              userId: seller.id,
+              type: 'system',
+              title: 'New Buyer Request',
+              content: `A new request for ${formData.game} (${formData.category}) has been posted: "${formData.title}"`,
+              link: `/marketplace/requests/${data.id}`
+            })
+          );
+          await Promise.all(notificationPromises);
+        }
+      } catch (notifyErr) {
+        console.error('Error notifying sellers:', notifyErr);
+        // Don't block the user if notifications fail
+      }
+
       // Redirect immediately to avoid "freeze" feeling
       try {
         router.replace(`/orders/${data.id}`);
@@ -120,14 +145,14 @@ export default function SubmitRequestPage() {
 
       <div className="container mx-auto px-6 relative z-10">
         <div className="max-w-3xl mx-auto">
-          <div className="flex flex-col gap-4 mb-12">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20 shadow-lg">
+          <div className="flex flex-col md:flex-row items-center gap-4 mb-8 md:mb-12">
+            <div className="flex items-center gap-4 w-full md:w-auto">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20 shadow-lg shrink-0">
                 <Zap className="w-6 h-6 text-amber-500" />
               </div>
-              <h1 className="text-4xl font-black text-white uppercase tracking-tight">Submit Request</h1>
+              <h1 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tight">Submit Request</h1>
             </div>
-            <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs max-w-xl">
+            <p className="text-zinc-500 font-bold uppercase tracking-widest text-[10px] md:text-xs max-w-xl text-center md:text-left">
               Describe what you need and professional sellers will submit their best offers.
             </p>
           </div>
@@ -143,8 +168,8 @@ export default function SubmitRequestPage() {
               </p>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-8">
-              <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-10 backdrop-blur-xl space-y-8">
+            <form onSubmit={handleSubmit} className="space-y-6 md:space-y-8">
+              <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 backdrop-blur-xl space-y-6 md:space-y-8">
                 <div className="space-y-6">
                   <div className="space-y-3">
                     <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.4em] ml-1">Request Title</label>

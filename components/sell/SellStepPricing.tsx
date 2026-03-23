@@ -54,6 +54,20 @@ export function SellStepPricing({ formData, updateFormData }: SellStepPricingPro
             </div>
           </div>
         </div>
+
+        {formData.price && parseFloat(formData.price) > 0 && (
+          <div className="mt-6 p-6 bg-amber-500/[0.03] border border-amber-500/10 rounded-2xl flex items-center justify-between">
+            <div className="space-y-1">
+              <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Estimated Payout</p>
+              <p className="text-xs text-zinc-400 font-medium">After 5% platform fee</p>
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-black text-amber-500 tracking-tighter">
+                ${(parseFloat(formData.price) * 0.95).toFixed(2)}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       <div>

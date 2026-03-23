@@ -2,12 +2,12 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { Zap } from 'lucide-react';
+import { ShieldCheck, Zap } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Listing } from '@/types';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 
 interface ListingCardProps {
   listing: Listing;
@@ -32,10 +32,16 @@ export function ListingCard({ listing, index = 0 }: ListingCardProps) {
               className="object-cover transition-transform duration-700 group-hover:scale-110"
               referrerPolicy="no-referrer"
             />
-            <div className="absolute top-4 left-4 flex space-x-2">
-              <div className="bg-zinc-950/80 backdrop-blur-md px-3 py-1 rounded-lg border border-white/5 text-[9px] font-black uppercase tracking-widest text-amber-500">
+            <div className="absolute top-4 left-4 flex flex-col gap-2">
+              <div className="bg-zinc-950/80 backdrop-blur-md px-3 py-1 rounded-lg border border-white/5 text-[9px] font-black uppercase tracking-widest text-amber-500 w-fit">
                 {listing.gameId}
               </div>
+              {listing.seller?.isVerified && (
+                <div className="bg-emerald-500/90 backdrop-blur-md px-2 py-1 rounded-lg border border-emerald-400/20 text-[7px] font-black uppercase tracking-widest text-white flex items-center gap-1 w-fit">
+                  <ShieldCheck className="w-2.5 h-2.5" />
+                  Verified
+                </div>
+              )}
             </div>
           </div>
           <CardContent className="p-8">

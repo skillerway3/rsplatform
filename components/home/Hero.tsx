@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 
 export function Hero() {
   return (
-    <section className="relative min-h-screen flex items-center pt-20 overflow-hidden">
+    <section className="relative py-32 flex items-center overflow-hidden">
       {/* Background Accents */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-amber-500/10 rounded-full blur-[120px] animate-pulse" />
@@ -25,12 +25,12 @@ export function Hero() {
               <div className="h-px w-12 bg-amber-500" />
               <span className="text-amber-500 text-[10px] font-black uppercase tracking-[0.5em]">The Premium Marketplace</span>
             </div>
-            <h1 className="text-7xl md:text-9xl font-black text-zinc-100 tracking-tighter leading-[0.85] mb-10 uppercase">
+            <h1 className="text-6xl md:text-8xl font-black text-zinc-100 tracking-tighter leading-[0.85] mb-10 uppercase">
               THE <span className="text-amber-500">PREMIUM</span> TRADING EXPERIENCE.
             </h1>
             <p className="text-zinc-400 text-lg md:text-xl font-medium leading-relaxed max-w-2xl mb-12">
               Experience the most secure, high-liquidity marketplace for OSRS and RS3 digital assets. 
-              Join 50,000+ verified traders in our marketplace.
+              Join verified traders in our marketplace.
             </p>
             <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6">
               <Link href="/browse">
@@ -45,26 +45,6 @@ export function Hero() {
                 </Button>
               </Link>
             </div>
-          </motion.div>
-
-          {/* Stats */}
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4, duration: 0.8 }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-12 mt-24 pt-12 border-t border-white/5"
-          >
-            {[
-              { label: 'Volume', value: '$2.4M+' },
-              { label: 'Traders', value: '50K+' },
-              { label: 'Delivery', value: '< 3m' },
-              { label: 'Security', value: '100%' },
-            ].map((stat, i) => (
-              <div key={i}>
-                <div className="text-2xl font-black text-zinc-100 tracking-tighter mb-1">{stat.value}</div>
-                <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">{stat.label}</div>
-              </div>
-            ))}
           </motion.div>
         </div>
       </div>

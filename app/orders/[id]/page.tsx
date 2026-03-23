@@ -4,13 +4,16 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { ShieldCheck, Clock, Zap, MessageSquare, CheckCircle2, AlertCircle, Loader2, ArrowLeft, ExternalLink, ChevronRight, Truck, Upload } from 'lucide-react';
+import { ShieldCheck, Clock, Zap, MessageSquare, CheckCircle2, AlertCircle, Loader2, ArrowLeft, ExternalLink, ChevronRight, Truck, Upload, X, Package2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { PayPalButtons } from "@paypal/react-paypal-js";
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { ChatModal } from '@/components/marketplace/ChatModal';
 import { motion } from 'motion/react';
+import { PromptModal } from '@/components/ui/PromptModal';
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
+import { createNotification } from '@/lib/notifications';
 
 interface Request {
   id: string;
@@ -35,6 +38,7 @@ interface Offer {
   profiles?: {
     username: string;
     is_verified_seller: boolean;
+    is_trusted_seller: boolean;
     avatar_url: string;
     average_rating: number;
     review_count: number;
@@ -57,9 +61,20 @@ export default function OrderPage() {
   const [deliveryNote, setDeliveryNote] = useState('');
   const [deliveryFile, setDeliveryFile] = useState<File | null>(null);
   const [review, setReview] = useState<any>(null);
+  const [declineReason, setDeclineReason] = useState('');
+  const [extraTimeHours, setExtraTimeHours] = useState('');
+  const [extraTimeReason, setExtraTimeReason] = useState('');
+  const [isDeclining, setIsDeclining] = useState(false);
+  const [isRequestingExtraTime, setIsRequestingExtraTime] = useState(false);
+  const [isRespondingToExtraTime, setIsRespondingToExtraTime] = useState(false);
   const [submittingReview, setSubmittingReview] = useState(false);
   const [rating, setRating] = useState(5);
   const [reviewText, setReviewText] = useState('');
+  const [showDeclineModal, setShowDeclineModal] = useState(false);
+  const [showExtraTimeModal, setShowExtraTimeModal] = useState(false);
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
+  const [isDisputing, setIsDisputing] = useState(false);
 
   const [orderType, setOrderType] = useState<'direct' | 'request' | null>(null);
   const [listing, setListing] = useState<any>(null);
@@ -73,7 +88,7 @@ export default function OrderPage() {
       const sellerIds = Array.from(new Set(offersData.map((o: any) => o.seller_id)));
       const { data: profilesData } = await supabase
         .from('profiles')
-        .select('id, username, is_verified_seller, avatar_url, average_rating, review_count')
+        .select('id, username, is_verified_seller, is_trusted_seller, avatar_url, average_rating, review_count')
         .in('id', sellerIds);
       
       const profilesMap = (profilesData || []).reduce((acc, profile) => {
@@ -220,7 +235,7 @@ export default function OrderPage() {
         // Fetch profile for the new offer
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('username, is_verified_seller, avatar_url, average_rating, review_count')
+          .select('username, is_verified_seller, is_trusted_seller, avatar_url, average_rating, review_count')
           .eq('id', newOffer.seller_id)
           .single();
         
@@ -256,7 +271,14 @@ export default function OrderPage() {
         .select()
         .single();
 
-      if (error) throw error;
+      await createNotification({
+        userId: order.seller_id,
+        type: 'new_review',
+        title: 'New Review Received!',
+        content: `You received a ${rating}-star review for your recent order.`,
+        link: `/orders/${order.id}`
+      });
+
       setReview(data);
     } catch (err: any) {
       console.error('Error submitting review:', err);
@@ -268,7 +290,7 @@ export default function OrderPage() {
 
   const handleApprove = async () => {
     try {
-      setLoading(true);
+      setIsApproving(true);
       setError(null);
       
       // 1. Update order status
@@ -278,6 +300,24 @@ export default function OrderPage() {
         .eq('id', order.id);
 
       if (orderError) throw orderError;
+
+      // Notify seller that order is completed
+      await createNotification({
+        userId: order.seller_id,
+        type: 'order_completed',
+        title: 'Order Completed!',
+        content: `The buyer has approved your delivery and completed the order.`,
+        link: `/orders/${order.id}`
+      });
+
+      // Notify buyer to leave a review (persistent notification)
+      await createNotification({
+        userId: order.buyer_id,
+        type: 'system',
+        title: 'Rate Your Experience',
+        content: 'Your order is complete! Please take a moment to leave a review for the seller.',
+        link: `/orders/${order.id}`
+      });
 
       // 2. Update request status if it's a request-based order
       if (order.request_id) {
@@ -294,13 +334,13 @@ export default function OrderPage() {
       console.error('Error approving order:', err);
       setError('Failed to approve order.');
     } finally {
-      setLoading(false);
+      setIsApproving(false);
     }
   };
 
   const handleDispute = async () => {
     try {
-      setLoading(true);
+      setIsDisputing(true);
       setError(null);
       const { error } = await supabase
         .from('orders')
@@ -314,7 +354,7 @@ export default function OrderPage() {
       console.error('Error opening dispute:', err);
       setError('Failed to open dispute.');
     } finally {
-      setLoading(false);
+      setIsDisputing(false);
     }
   };
 
@@ -408,6 +448,110 @@ export default function OrderPage() {
     }
   };
 
+  const handleDecline = async (reason?: string) => {
+    const finalReason = reason || declineReason;
+    if (!user || !order || !finalReason) return;
+    setIsDeclining(true);
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ 
+          status: 'cancelled', 
+          decline_reason: finalReason,
+          resolved_at: new Date().toISOString()
+        })
+        .eq('id', order.id);
+
+      if (error) throw error;
+
+      await createNotification({
+        userId: order.buyer_id,
+        type: 'order_cancelled',
+        title: 'Order Declined',
+        content: `Your order has been declined by the seller. Reason: ${finalReason}`,
+        link: `/orders/${order.id}`
+      });
+
+      await fetchData();
+    } catch (err: any) {
+      console.error('Error declining order:', err);
+      setError('Failed to decline order.');
+    } finally {
+      setIsDeclining(false);
+    }
+  };
+
+  const handleRequestExtraTime = async (hours?: string, reason?: string) => {
+    const finalHours = hours || extraTimeHours;
+    const finalReason = reason || extraTimeReason;
+    if (!user || !order || !finalHours || !finalReason) return;
+    setIsRequestingExtraTime(true);
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ 
+          extra_time_requested_at: new Date().toISOString(),
+          extra_time_reason: finalReason,
+          extra_time_hours: parseInt(finalHours),
+          extra_time_status: 'pending'
+        })
+        .eq('id', order.id);
+
+      if (error) throw error;
+
+      await createNotification({
+        userId: order.buyer_id,
+        type: 'extra_time_request',
+        title: 'Extra Time Requested',
+        content: `The seller requested ${finalHours} more hours for your order. Reason: ${finalReason}`,
+        link: `/orders/${order.id}`
+      });
+
+      await fetchData();
+    } catch (err: any) {
+      console.error('Error requesting extra time:', err);
+      setError('Failed to request extra time.');
+    } finally {
+      setIsRequestingExtraTime(false);
+    }
+  };
+
+  const handleRespondToExtraTime = async (status: 'accepted' | 'declined') => {
+    if (!user || !order) return;
+    setIsRespondingToExtraTime(true);
+    try {
+      const updates: any = { extra_time_status: status };
+      
+      if (status === 'accepted' && order.deadline_at) {
+        const currentDeadline = new Date(order.deadline_at);
+        currentDeadline.setHours(currentDeadline.getHours() + order.extra_time_hours);
+        updates.deadline_at = currentDeadline.toISOString();
+      }
+
+      const { error } = await supabase
+        .from('orders')
+        .update(updates)
+        .eq('id', order.id);
+
+      if (error) throw error;
+
+      await createNotification({
+        userId: order.seller_id,
+        type: 'extra_time_response',
+        title: `Extra Time Request ${status.toUpperCase()}`,
+        content: `The buyer has ${status} your request for extra time.`,
+        link: `/orders/${order.id}`
+      });
+
+      await fetchData();
+    } catch (err: any) {
+      console.error('Error responding to extra time:', err);
+      setError('Failed to respond to extra time.');
+    } finally {
+      setIsRespondingToExtraTime(false);
+    }
+  };
+
   const handleCloseRequest = async () => {
     if (!id || !user) return;
     setClosing(true);
@@ -471,16 +615,30 @@ export default function OrderPage() {
   return (
     <div className="min-h-screen bg-zinc-950 pt-32 pb-20">
       <div className="container mx-auto px-6">
-        <Link href="/dashboard" className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-amber-500 transition-colors mb-8 group">
-          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-          Back to Dashboard
-        </Link>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 md:mb-12 gap-6">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20 shadow-lg shrink-0">
+              <Package2 className="w-6 h-6 text-amber-500" />
+            </div>
+            <div>
+              <h1 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tight">Order <span className="text-amber-500">#{order?.id?.slice(0, 8) || id?.slice(0, 8)}</span></h1>
+              <p className="text-zinc-500 font-bold uppercase tracking-widest text-[10px]">Order Details & Management</p>
+            </div>
+          </div>
+          <div className={cn(
+            "px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border text-center",
+            order?.status === 'completed' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" :
+            order?.status === 'cancelled' ? "bg-red-500/10 text-red-500 border-red-500/20" :
+            "bg-amber-500/10 text-amber-500 border-amber-500/20"
+          )}>
+            Status: {order?.status || request?.status || 'PENDING'}
+          </div>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-12">
           {/* Left Column: Order/Request Details */}
           <div className="lg:col-span-2 space-y-8">
-            <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-10 backdrop-blur-xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-10">
+            <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 backdrop-blur-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-6 md:p-10">
                 <div className={cn(
                   "px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border",
                   isOpen ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-zinc-800 text-zinc-500 border-zinc-700"
@@ -489,13 +647,13 @@ export default function OrderPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2 mb-8">
-                <h1 className="text-3xl font-black text-white uppercase tracking-tight">
+              <div className="flex flex-col gap-2 mb-8 pr-24 md:pr-0">
+                <h1 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tight">
                   {orderType === 'direct' ? listing?.title : request?.title}
                 </h1>
-                <div className="flex items-center gap-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
                   <span className="flex items-center gap-1.5"><Zap className="w-3 h-3" /> {orderType === 'direct' ? listing?.game : request?.game}</span>
-                  <span className="w-1 h-1 rounded-full bg-zinc-800" />
+                  <span className="hidden md:block w-1 h-1 rounded-full bg-zinc-800" />
                   <span className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> {new Date(orderType === 'direct' ? order?.created_at : (request?.created_at || Date.now())).toLocaleDateString()}</span>
                 </div>
               </div>
@@ -511,15 +669,15 @@ export default function OrderPage() {
             </div>
 
             {order && order.status === 'completed' && isBuyer && (
-              <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-10 backdrop-blur-xl space-y-8">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center">
-                    <Zap className="w-6 h-6 text-amber-500" />
+              <div className="bg-gradient-to-br from-amber-500/10 to-zinc-900/40 border border-amber-500/20 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 backdrop-blur-xl space-y-8 shadow-lg shadow-amber-500/5">
+                <div className="flex flex-col md:flex-row md:items-center gap-4">
+                  <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
+                    <Zap className="w-6 h-6 text-zinc-950" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-black text-white uppercase tracking-widest">Order Completed</h3>
-                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">
-                      {review ? 'Thank you for your feedback!' : 'How was your experience with this seller?'}
+                    <h3 className="text-xl font-black text-white uppercase tracking-widest">Action Required: Rate Seller</h3>
+                    <p className="text-[10px] text-amber-500 font-black uppercase tracking-widest">
+                      {review ? 'Thank you for your feedback!' : 'Your order is complete. Please rate the seller to finalize the experience.'}
                     </p>
                   </div>
                 </div>
@@ -560,10 +718,10 @@ export default function OrderPage() {
                     <Button 
                       type="submit"
                       variant="gold" 
-                      className="h-12 px-8 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-amber-500/10"
+                      className="h-14 px-12 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] shadow-lg shadow-amber-500/20 w-full md:w-auto"
                       disabled={submittingReview}
                     >
-                      {submittingReview ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Submit Review'}
+                      {submittingReview ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Submit Review & Complete'}
                     </Button>
                   </form>
                 ) : (
@@ -585,31 +743,33 @@ export default function OrderPage() {
             )}
 
             {order && order.status === 'delivered' && (
-              <div className="bg-amber-500/5 border border-amber-500/20 rounded-[2.5rem] p-10 backdrop-blur-xl space-y-8">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center">
-                    <CheckCircle2 className="w-6 h-6 text-amber-500" />
+              <div className="bg-amber-500/5 border border-amber-500/20 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 backdrop-blur-xl space-y-8">
+                <div className="flex flex-col md:flex-row md:items-center gap-4">
+                  <div className="flex items-center gap-4 w-full md:w-auto">
+                    <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center shrink-0">
+                      <CheckCircle2 className="w-6 h-6 text-amber-500" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black text-white uppercase tracking-widest">Review Delivery</h3>
+                      <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">The seller has delivered the service. Please review the proof.</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-lg font-black text-white uppercase tracking-widest">Review Delivery</h3>
-                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">The seller has delivered the service. Please review the proof.</p>
-                  </div>
-                  <div className="flex gap-3">
+                  <div className="flex gap-3 w-full md:w-auto">
                     <Button 
                       variant="outline" 
-                      className="h-10 rounded-xl text-[10px] font-black uppercase tracking-widest border-zinc-800"
+                      className="flex-1 md:flex-none h-10 rounded-xl text-[10px] font-black uppercase tracking-widest border-zinc-800"
                       onClick={handleDispute}
-                      disabled={loading}
+                      disabled={isDisputing}
                     >
-                      Dispute
+                      {isDisputing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Dispute'}
                     </Button>
                     <Button 
                       variant="gold" 
-                      className="h-10 rounded-xl text-[10px] font-black uppercase tracking-widest"
-                      onClick={handleApprove}
-                      disabled={loading}
+                      className="flex-1 md:flex-none h-10 rounded-xl text-[10px] font-black uppercase tracking-widest"
+                      onClick={() => setShowApproveModal(true)}
+                      disabled={isApproving}
                     >
-                      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Approve & Release'}
+                      {isApproving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Approve & Release'}
                     </Button>
                   </div>
                 </div>
@@ -704,8 +864,13 @@ export default function OrderPage() {
                                   {offer.profiles?.username || 'Anonymous Seller'}
                                 </h3>
                                 {offer.profiles?.is_verified_seller && (
-                                  <div className="bg-emerald-500/10 text-emerald-500 p-1 rounded-lg">
+                                  <div className="bg-emerald-500/10 text-emerald-500 p-1 rounded-lg" title="Verified Seller">
                                     <ShieldCheck className="w-3.5 h-3.5" />
+                                  </div>
+                                )}
+                                {offer.profiles?.is_trusted_seller && (
+                                  <div className="bg-amber-500/10 text-amber-500 p-1 rounded-lg" title="Trusted Seller">
+                                    <Zap className="w-3.5 h-3.5 fill-amber-500" />
                                   </div>
                                 )}
                                 {offer.profiles && offer.profiles.average_rating > 0 && (
@@ -884,12 +1049,84 @@ export default function OrderPage() {
                     <span className="text-white">{offers.length}</span>
                   </div>
                   {order && (
-                    <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest">
-                      <span className="text-zinc-500">Order Price</span>
-                      <span className="text-amber-500 font-black">${order.total_price}</span>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest">
+                        <span className="text-zinc-500">Order Price</span>
+                        <span className="text-white">${order.total_price}</span>
+                      </div>
+                      {isSeller && (
+                        <>
+                          <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest">
+                            <span className="text-zinc-500">Platform Fee (5%)</span>
+                            <span className="text-red-500">-${order.platform_fee}</span>
+                          </div>
+                          <div className="h-px bg-zinc-800/50" />
+                          <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest">
+                            <span className="text-zinc-500">Your Payout</span>
+                            <span className="text-emerald-500 font-black">${order.seller_payout}</span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
+
+                {order && isSeller && order.status === 'processing' && (
+                  <div className="space-y-3 pt-4 border-t border-zinc-800/50">
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button 
+                        variant="outline" 
+                        className="h-10 rounded-xl text-[9px] font-black uppercase tracking-widest border-zinc-800 text-zinc-400 hover:text-red-500 hover:border-red-500/30"
+                        onClick={() => setShowDeclineModal(true)}
+                        disabled={isDeclining}
+                      >
+                        {isDeclining ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Decline Order'}
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        className="h-10 rounded-xl text-[9px] font-black uppercase tracking-widest border-zinc-800 text-zinc-400 hover:text-amber-500 hover:border-amber-500/30"
+                        onClick={() => setShowExtraTimeModal(true)}
+                        disabled={isRequestingExtraTime}
+                      >
+                        {isRequestingExtraTime ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Extra Time'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {order && isBuyer && order.extra_time_status === 'pending' && (
+                  <div className="mt-6 p-6 bg-amber-500/5 border border-amber-500/20 rounded-2xl space-y-4">
+                    <div className="flex items-start gap-3">
+                      <Clock className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-1">Extra Time Requested</p>
+                        <p className="text-[9px] text-zinc-400 leading-relaxed">
+                          The seller requested <strong>{order.extra_time_hours} hours</strong> extra time.
+                          <br />
+                          Reason: <em>{order.extra_time_reason}</em>
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button 
+                        variant="outline" 
+                        className="h-9 rounded-lg text-[8px] font-black uppercase tracking-widest border-zinc-800 text-zinc-400 hover:text-red-500"
+                        onClick={() => handleRespondToExtraTime('declined')}
+                        disabled={isRespondingToExtraTime}
+                      >
+                        Decline
+                      </Button>
+                      <Button 
+                        variant="gold" 
+                        className="h-9 rounded-lg text-[8px] font-black uppercase tracking-widest"
+                        onClick={() => handleRespondToExtraTime('accepted')}
+                        disabled={isRespondingToExtraTime}
+                      >
+                        Accept
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -915,6 +1152,57 @@ export default function OrderPage() {
           buyerId={user?.id || ''}
           title={activeChat.title}
         />
+      )}
+
+      <PromptModal
+        isOpen={showDeclineModal}
+        onClose={() => setShowDeclineModal(false)}
+        onConfirm={(values) => handleDecline(values.reason)}
+        title="Decline Order"
+        message="Please provide a reason for declining this order. The buyer will be notified."
+        fields={[
+          { key: 'reason', label: 'Reason for Declining', placeholder: 'e.g. Out of stock, too busy...', required: true }
+        ]}
+        confirmText="Decline Order"
+      />
+
+      <PromptModal
+        isOpen={showExtraTimeModal}
+        onClose={() => setShowExtraTimeModal(false)}
+        onConfirm={(values) => handleRequestExtraTime(values.hours, values.reason)}
+        title="Request Extra Time"
+        message="Request more time from the buyer. They must approve this request."
+        fields={[
+          { key: 'hours', label: 'Extra Hours Needed', placeholder: 'e.g. 24', type: 'number', required: true },
+          { key: 'reason', label: 'Reason for Request', placeholder: 'e.g. Need more time to polish...', required: true }
+        ]}
+        confirmText="Send Request"
+      />
+
+      <ConfirmationModal
+        isOpen={showApproveModal}
+        onClose={() => setShowApproveModal(false)}
+        onConfirm={handleApprove}
+        title="Approve Delivery"
+        message="Are you sure you want to approve this delivery and release the payment to the seller? This action cannot be undone."
+        confirmText="Approve & Release"
+        variant="warning"
+      />
+
+      {error && (
+        <div className="fixed bottom-8 right-8 z-50">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-red-500 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3"
+          >
+            <AlertCircle className="w-5 h-5" />
+            <p className="text-sm font-black uppercase tracking-widest">{error}</p>
+            <button onClick={() => setError(null)} className="p-1 hover:bg-white/10 rounded-lg">
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        </div>
       )}
     </div>
   );

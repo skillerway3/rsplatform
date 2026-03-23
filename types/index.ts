@@ -23,6 +23,7 @@ export interface User {
   rating: number;
   totalSales: number;
   isVerified: boolean;
+  isTrusted?: boolean;
   joinedAt: string;
 }
 

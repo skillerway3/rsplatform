@@ -3,15 +3,18 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { ShieldCheck, MessageSquare, User, Menu, X, PlusCircle, ChevronDown, LogOut, LayoutDashboard } from 'lucide-react';
+import { ShieldCheck, MessageSquare, User, Menu, X, PlusCircle, ChevronDown, LogOut, LayoutDashboard, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { motion, AnimatePresence } from 'motion/react';
 import { NAV_SECTIONS } from '@/data/navigation';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { useNotifications } from '@/components/providers/NotificationProvider';
+import { NotificationDropdown } from '@/components/layout/NotificationDropdown';
 
 export function Navbar() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, isVerifiedSeller } = useAuth();
+  const { unreadCount } = useNotifications();
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -74,7 +77,7 @@ export function Navbar() {
                   onClick={() => setActiveDropdown(activeDropdown === section.id ? null : section.id)}
                   className={cn(
                     'flex items-center space-x-2 text-[11px] font-black uppercase tracking-[0.25em] transition-all duration-300 py-2 group',
-                    activeDropdown === section.id || isActive ? 'text-amber-500' : 'text-zinc-500 hover:text-zinc-100'
+                    activeDropdown === section.id || isActive ? 'text-amber-500' : 'text-zinc-100 hover:text-amber-500'
                   )}
                 >
                   <span className="relative">
@@ -86,7 +89,7 @@ export function Navbar() {
                   </span>
                   <ChevronDown className={cn(
                     "w-3 h-3 transition-transform duration-500 ease-out",
-                    activeDropdown === section.id ? "rotate-180 text-amber-500" : "text-zinc-600 group-hover:text-zinc-400"
+                    activeDropdown === section.id ? "rotate-180 text-amber-500" : "text-zinc-400 group-hover:text-amber-500"
                   )} />
                 </button>
 
@@ -131,10 +134,10 @@ export function Navbar() {
             href="/support"
             className={cn(
               'text-[11px] font-black uppercase tracking-[0.25em] transition-all duration-300 py-2 relative group',
-              pathname === '/support' ? 'text-amber-500' : 'text-zinc-500 hover:text-zinc-100'
+              pathname === '/support' ? 'text-amber-500' : 'text-zinc-100 hover:text-amber-500'
             )}
           >
-            <span>Support</span>
+            <span>Contact Us</span>
             <span className={cn(
               "absolute -bottom-1 left-0 w-0 h-[1px] bg-amber-500 transition-all duration-300 group-hover:w-full",
               pathname === '/support' && "w-full"
@@ -144,17 +147,18 @@ export function Navbar() {
 
         <div className="hidden md:flex items-center space-x-6">
           <div className="flex items-center space-x-2">
-            <Link href="/messages" className="p-2 text-zinc-500 hover:text-amber-500 transition-colors relative">
+            <Link href="/messages" className="p-2 text-zinc-100 hover:text-amber-500 transition-colors relative">
               <MessageSquare className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-amber-500 rounded-full border-2 border-zinc-950" />
             </Link>
+            
+            <NotificationDropdown />
             
             <div className="relative profile-dropdown-container">
               <button 
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
                 className={cn(
                   "p-2 transition-colors rounded-xl",
-                  isProfileOpen ? "text-amber-500 bg-amber-500/10" : "text-zinc-500 hover:text-amber-500"
+                  isProfileOpen ? "text-amber-500 bg-amber-500/10" : "text-zinc-100 hover:text-amber-500"
                 )}
               >
                 <User className="w-5 h-5" />
@@ -173,7 +177,15 @@ export function Navbar() {
                       <>
                         <div className="px-5 py-3 border-b border-white/5 mb-2">
                           <p className="text-[10px] font-black text-white uppercase tracking-widest truncate">{user.email}</p>
-                          <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-[0.2em] mt-1">Verified Member</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-[0.2em]">Member</p>
+                            {isVerifiedSeller && (
+                              <div className="flex items-center gap-1 px-1.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md">
+                                <ShieldCheck className="w-2.5 h-2.5 text-emerald-500" />
+                                <span className="text-[7px] font-black text-emerald-500 uppercase tracking-widest">Verified</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <Link
                           href="/profile"
@@ -199,15 +211,29 @@ export function Navbar() {
                           <ShieldCheck className="w-4 h-4" />
                           My Orders
                         </Link>
+                        <div className="flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-600 cursor-not-allowed select-none">
+                          <Zap className="w-4 h-4" />
+                          Loyalty (Coming Soon)
+                        </div>
                         {user.email === 'skillerway100@gmail.com' && (
-                          <Link
-                            href="/admin/verifications"
-                            className="flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-amber-500 hover:bg-amber-500/5 transition-all"
-                            onClick={() => setIsProfileOpen(false)}
-                          >
-                            <ShieldCheck className="w-4 h-4" />
-                            Admin Verifications
-                          </Link>
+                          <>
+                            <Link
+                              href="/admin/verifications"
+                              className="flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-amber-500 hover:bg-amber-500/5 transition-all"
+                              onClick={() => setIsProfileOpen(false)}
+                            >
+                              <ShieldCheck className="w-4 h-4" />
+                              Admin Verifications
+                            </Link>
+                            <Link
+                              href="/admin/sellers"
+                              className="flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-amber-500 hover:bg-amber-500/5 transition-all"
+                              onClick={() => setIsProfileOpen(false)}
+                            >
+                              <ShieldCheck className="w-4 h-4" />
+                              Admin Sellers
+                            </Link>
+                          </>
                         )}
                         <button
                           onClick={() => {
@@ -338,25 +364,50 @@ export function Navbar() {
               <div className="pt-8 flex flex-col space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <Link 
-                    href="/dashboard" 
-                    className="flex items-center justify-center py-4 bg-zinc-900 rounded-xl text-zinc-400 font-black uppercase tracking-widest text-xs border border-white/5"
+                    href="/dashboard/requests" 
+                    className="flex items-center justify-center py-4 bg-zinc-900 rounded-xl text-zinc-400 font-black uppercase tracking-widest text-[10px] border border-white/5"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    Dashboard
+                    My Requests
+                  </Link>
+                  <Link 
+                    href="/dashboard/sales" 
+                    className="flex items-center justify-center py-4 bg-zinc-900 rounded-xl text-zinc-400 font-black uppercase tracking-widest text-[10px] border border-white/5"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Sales
                   </Link>
                   <Link 
                     href="/messages" 
-                    className="flex items-center justify-center py-4 bg-zinc-900 rounded-xl text-zinc-400 font-black uppercase tracking-widest text-xs border border-white/5"
+                    className="flex items-center justify-center py-4 bg-zinc-900 rounded-xl text-zinc-400 font-black uppercase tracking-widest text-[10px] border border-white/5"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Messages
                   </Link>
+                  <Link 
+                    href="/profile" 
+                    className="flex items-center justify-center py-4 bg-zinc-900 rounded-xl text-zinc-400 font-black uppercase tracking-widest text-[10px] border border-white/5"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Profile
+                  </Link>
                 </div>
-                <Link href="/sell" className="w-full">
-                  <Button variant="gold" className="w-full py-7 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-amber-500/10">
-                    List Item
-                  </Button>
-                </Link>
+                <div className="flex gap-4">
+                  <Link href="/sell" className="flex-1">
+                    <Button variant="gold" className="w-full py-7 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-amber-500/10">
+                      List Item
+                    </Button>
+                  </Link>
+                  <button 
+                    onClick={() => {
+                      signOut();
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="px-6 py-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-500 font-black uppercase tracking-widest text-[10px] hover:bg-red-500/20 transition-all"
+                  >
+                    <LogOut className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
             </div>
           </motion.div>
