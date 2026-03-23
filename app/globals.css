@@ -28,7 +28,10 @@
     @apply border-zinc-800/40;
   }
   body {
-    @apply bg-[#0f0f11] text-zinc-100 font-sans antialiased selection:bg-amber-500/30 selection:text-amber-200;
+    @apply bg-[#0f0f11] text-zinc-100 font-sans antialiased;
+  }
+  ::selection {
+    @apply bg-amber-500/30 text-amber-200;
   }
 }
 
@@ -38,7 +41,12 @@
   }
   
   .premium-card {
-    @apply bg-[#161618]/40 backdrop-blur-2xl border border-zinc-800/40 rounded-[2.5rem] shadow-2xl transition-all duration-500 hover:border-amber-500/30 hover:shadow-amber-500/5;
+    @apply bg-[#161618]/40 backdrop-blur-2xl border border-zinc-800/40 rounded-[2.5rem] shadow-2xl transition-all duration-500;
+  }
+  
+  .premium-card:hover {
+    @apply border-amber-500/30;
+    box-shadow: 0 25px 50px -12px rgba(245, 158, 11, 0.05);
   }
 
   .text-gradient-gold {

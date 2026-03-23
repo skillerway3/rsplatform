@@ -1,10 +1,6 @@
-node_modules/
 .next/
-build/
-dist/
-coverage/
-.DS_Store
-*.log
+node_modules/
+*.zip
 .env*
 !.env.example
-*.zip
+.vercel
