@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
-import { Plus, Trash2, ChevronDown, Info, Upload, FileText } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, Info, Upload, FileText, Check } from 'lucide-react';
 import { OSRS_SKILLS } from '@/data/boosting/osrs-skills';
 import { AccountTypeSelector } from './AccountTypeSelector';
 import * as Icons from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface SkillRow {
   id: string;
@@ -16,6 +17,88 @@ interface SkillRow {
 
 interface PowerLevelingFormProps {
   onUpdate: (summary: { service: string; details: string[] }) => void;
+}
+
+function CustomSkillSelect({ value, onChange }: { value: string, onChange: (val: string) => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedSkill = OSRS_SKILLS.find(s => s.id === value);
+  const IconComponent = (Icons as any)[selectedSkill?.icon || 'Sword'];
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={cn(
+          "w-full h-12 bg-zinc-950/50 border rounded-xl pl-14 pr-10 text-[13px] font-bold text-zinc-100 focus:outline-none transition-all shadow-inner flex items-center justify-between group",
+          isOpen ? "border-amber-500/50" : "border-zinc-800 hover:border-zinc-700"
+        )}
+      >
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-zinc-950 flex items-center justify-center border border-zinc-800 group-hover:border-amber-500/30 transition-colors z-10">
+          {IconComponent && <IconComponent className="w-4 h-4 text-amber-500" />}
+        </div>
+        <span className="truncate">{selectedSkill?.label || 'Select Skill'}</span>
+        <ChevronDown className={cn(
+          "absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600 transition-transform duration-300",
+          isOpen ? "rotate-180 text-amber-500" : "group-hover:text-zinc-400"
+        )} />
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            transition={{ duration: 0.15 }}
+            className="absolute z-50 w-full mt-2 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden"
+          >
+            <div className="max-h-60 overflow-y-auto custom-scrollbar p-1">
+              {OSRS_SKILLS.map((skill) => {
+                const SkillIcon = (Icons as any)[skill.icon || 'Sword'];
+                const isSelected = skill.id === value;
+                return (
+                  <button
+                    key={skill.id}
+                    type="button"
+                    onClick={() => {
+                      onChange(skill.id);
+                      setIsOpen(false);
+                    }}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors",
+                      isSelected ? "bg-amber-500/10 text-amber-500" : "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                    )}
+                  >
+                    <div className={cn(
+                      "w-6 h-6 rounded flex items-center justify-center border",
+                      isSelected ? "bg-amber-500/20 border-amber-500/30" : "bg-zinc-950 border-zinc-800"
+                    )}>
+                      {SkillIcon && <SkillIcon className={cn("w-3.5 h-3.5", isSelected ? "text-amber-500" : "text-zinc-500")} />}
+                    </div>
+                    <span className="text-sm font-medium flex-1">{skill.label}</span>
+                    {isSelected && <Check className="w-4 h-4 text-amber-500" />}
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 }
 
 export function PowerLevelingForm({ onUpdate }: PowerLevelingFormProps) {
@@ -100,21 +183,10 @@ export function PowerLevelingForm({ onUpdate }: PowerLevelingFormProps) {
                     {/* Skill Selector */}
                     <div className="sm:col-span-5 space-y-2.5">
                       <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] ml-1">Select Skill</label>
-                      <div className="relative group/select">
-                        <div className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-zinc-950 flex items-center justify-center border border-zinc-800 group-focus-within/select:border-amber-500/30 transition-colors z-10">
-                          {IconComponent && <IconComponent className="w-4 h-4 text-amber-500" />}
-                        </div>
-                        <select
-                          value={row.skillId}
-                          onChange={(e) => updateRow(row.id, 'skillId', e.target.value)}
-                          className="w-full h-12 bg-zinc-950/50 border border-zinc-800 rounded-xl pl-14 pr-10 text-[13px] font-bold text-zinc-100 focus:outline-none focus:border-amber-500/50 transition-all appearance-none shadow-inner cursor-pointer"
-                        >
-                          {OSRS_SKILLS.map((skill) => (
-                            <option key={skill.id} value={skill.id}>{skill.label}</option>
-                          ))}
-                        </select>
-                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600 pointer-events-none group-hover/select:text-zinc-400 transition-colors" />
-                      </div>
+                      <CustomSkillSelect 
+                        value={row.skillId} 
+                        onChange={(val) => updateRow(row.id, 'skillId', val)} 
+                      />
                     </div>
 
                     {/* Levels */}

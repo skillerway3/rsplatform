@@ -30,6 +30,7 @@ export function BoostingOrderCard({ options, onOptionChange, summary, className 
   const { user } = useAuth();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const toggleOptions = [
     { key: 'stream', label: 'Live Stream', description: 'Watch your progress live' },
@@ -46,12 +47,13 @@ export function BoostingOrderCard({ options, onOptionChange, summary, className 
     }
 
     setIsSubmitting(true);
+    setError(null);
     try {
       console.log('Submitting boosting request...', { summary, options });
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 24); // Default 24h
 
-      const { data, error } = await supabase
+      const { data, error: submitError } = await supabase
         .from('buyer_requests')
         .insert({
           buyer_id: user.id,
@@ -65,9 +67,9 @@ export function BoostingOrderCard({ options, onOptionChange, summary, className 
         .select()
         .single();
 
-      if (error) {
-        console.error('Supabase error submitting request:', error);
-        throw error;
+      if (submitError) {
+        console.error('Supabase error submitting request:', submitError);
+        throw submitError;
       }
 
       if (!data) {
@@ -82,9 +84,9 @@ export function BoostingOrderCard({ options, onOptionChange, summary, className 
         console.error('Router redirect failed, falling back to window.location:', redirectError);
         window.location.href = `/orders/${data.id}`;
       }
-    } catch (error: any) {
-      console.error('Error submitting request:', error);
-      // You might want to add a toast or error state here to inform the user
+    } catch (err: any) {
+      console.error('Error submitting request:', err);
+      setError(err.message || 'Failed to submit request. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -179,6 +181,13 @@ export function BoostingOrderCard({ options, onOptionChange, summary, className 
             </div>
           </div>
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-[11px] font-bold uppercase tracking-widest text-center">
+            {error}
+          </div>
+        )}
 
         {/* CTA */}
         <div className="space-y-6">

@@ -21,7 +21,7 @@ interface BoostingTabsProps {
 
 export function BoostingTabs({ activeTab, onTabChange, className }: BoostingTabsProps) {
   return (
-    <div className={cn("w-full overflow-x-auto no-scrollbar pb-6 -mx-6 px-6 md:mx-0 md:px-0", className)}>
+    <div className={cn("w-full overflow-x-auto custom-scrollbar pb-6 -mx-6 px-6 md:mx-0 md:px-0", className)}>
       <div className="flex items-center gap-3 min-w-max">
         {BOOSTING_SERVICES.map((service) => {
           const Icon = ICON_MAP[service.icon || 'Zap'] || Zap;
