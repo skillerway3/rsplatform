@@ -1,379 +1,483 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/components/auth/AuthProvider';
-import { ShieldCheck, Upload, CheckCircle2, AlertCircle, Loader2, ArrowLeft, Camera, FileText, Clock } from 'lucide-react';
+import {
+  ShieldCheck,
+  Clock,
+  CheckCircle2,
+  ExternalLink,
+  ChevronLeft,
+  Loader2,
+  User,
+  Phone,
+  FileText,
+  AlertCircle,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { cn } from '@/lib/utils';
-import Link from 'next/link';
+import { Card, CardContent } from '@/components/ui/Card';
+import { supabase } from '@/lib/supabase';
+import Image from 'next/image';
 
-export default function SellerVerifyPage() {
-  const { user, loading: authLoading } = useAuth();
+interface Verification {
+  id: string;
+  user_id: string;
+  phone_number: string;
+  document_type: string;
+  id_front_url: string;
+  id_back_url: string;
+  selfie_url: string;
+  id_front_signed_url?: string;
+  id_back_signed_url?: string;
+  selfie_signed_url?: string;
+  status: string;
+  created_at: string;
+  profiles?: {
+    username?: string | null;
+    avatar_url?: string | null;
+    is_admin?: boolean | null;
+    is_verified_seller?: boolean | null;
+  } | null;
+}
+
+export default function AdminVerificationsPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [status, setStatus] = useState<'not_started' | 'pending' | 'approved' | 'rejected'>('not_started');
-  const [rejectionReason, setRejectionReason] = useState<string | null>(null);
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [documentType, setDocumentType] = useState('ID');
-  const [files, setFiles] = useState<{
-    idFront: File | null;
-    idBack: File | null;
-    selfie: File | null;
-  }>({
-    idFront: null,
-    idBack: null,
-    selfie: null,
-  });
 
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [verifications, setVerifications] = React.useState<Verification[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [isAdmin, setIsAdmin] = React.useState(false);
+  const [processingId, setProcessingId] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [rejectionId, setRejectionId] = React.useState<string | null>(null);
+  const [rejectionReason, setRejectionReason] = React.useState('');
 
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-      router.push('/login');
-      return;
-    }
-
-    const checkStatus = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('seller_verifications')
-          .select('status, rejection_reason')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (data) {
-          setStatus(data.status as any);
-          setRejectionReason(data.rejection_reason);
-        }
-      } catch (err) {
-        console.error('Error checking verification status:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkStatus();
-  }, [user, authLoading, router]);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: keyof typeof files) => {
-    if (e.target.files && e.target.files[0]) {
-      setFiles(prev => ({ ...prev, [type]: e.target.files![0] }));
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
-    if (!files.idFront || !files.idBack || !files.selfie) {
-      setError('Please upload all required documents.');
-      return;
-    }
-
-    setSubmitting(true);
+  const fetchVerifications = React.useCallback(async () => {
+    setLoading(true);
     setError(null);
+
     try {
-      console.log('Submitting seller verification for user:', user.id);
-      // Upload files to Supabase Storage
-      const uploadFile = async (file: File, path: string) => {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${user.id}/${path}-${Math.random()}.${fileExt}`;
-        const { data, error } = await supabase.storage
-          .from('verifications')
-          .upload(fileName, file);
-        
-        if (error) {
-          console.error(`Error uploading ${path}:`, error);
-          throw error;
-        }
-
-        return data.path;
-      };
-
-      const [idFrontPath, idBackPath, selfiePath] = await Promise.all([
-        uploadFile(files.idFront, 'id-front'),
-        uploadFile(files.idBack, 'id-back'),
-        uploadFile(files.selfie, 'selfie'),
-      ]);
-
-      // Create verification record
-      const { error: insertError } = await supabase
+      const { data, error: fetchError } = await supabase
         .from('seller_verifications')
-        .insert({
-          user_id: user.id,
-          phone_number: phoneNumber,
-          document_type: documentType,
-          id_front_url: idFrontPath,
-          id_back_url: idBackPath,
-          selfie_url: selfiePath,
-          status: 'pending'
-        });
+        .select('*')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: true });
 
-      if (insertError) {
-        console.error('Error inserting verification record:', insertError);
-        throw insertError;
+      if (fetchError) throw fetchError;
+
+      const rows = (data || []) as Verification[];
+
+      const userIds = [...new Set(rows.map((v) => v.user_id).filter(Boolean))];
+
+      let profilesMap = new Map<string, any>();
+
+      if (userIds.length > 0) {
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url, is_admin, is_verified_seller')
+          .in('id', userIds);
+
+        if (profilesError) throw profilesError;
+
+        profilesMap = new Map((profilesData || []).map((p: any) => [p.id, p]));
       }
 
-      // Send admin notification
-      try {
-        await fetch('/api/notify-admin', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'seller_verification',
-            userId: user.id,
-            email: user.email
-          })
-        });
-      } catch (notifyErr) {
-        console.error('Failed to notify admin:', notifyErr);
-      }
+      const verificationsWithSignedUrls = await Promise.all(
+        rows.map(async (v) => {
+          const [front, back, selfie] = await Promise.all([
+            supabase.storage.from('verifications').createSignedUrl(v.id_front_url, 3600),
+            supabase.storage.from('verifications').createSignedUrl(v.id_back_url, 3600),
+            supabase.storage.from('verifications').createSignedUrl(v.selfie_url, 3600),
+          ]);
 
-      console.log('Verification application submitted successfully');
-      setStatus('pending');
-      setSuccess(true);
-      
-      // Redirect after a short delay to show success message
-      setTimeout(() => {
-        router.replace('/sell/verify/pending');
-      }, 1500);
+          return {
+            ...v,
+            profiles: profilesMap.get(v.user_id) || null,
+            id_front_signed_url: front.data?.signedUrl || '',
+            id_back_signed_url: back.data?.signedUrl || '',
+            selfie_signed_url: selfie.data?.signedUrl || '',
+          };
+        })
+      );
+
+      setVerifications(verificationsWithSignedUrls);
     } catch (err: any) {
-      console.error('Error submitting verification:', err);
-      setError('Failed to submit verification. Please ensure you have a "verifications" storage bucket created in Supabase with public access for uploads.');
+      console.error('Failed to fetch verifications:', err);
+      setError(err?.message || 'Failed to load verifications');
+      setVerifications([]);
     } finally {
-      setSubmitting(false);
+      setLoading(false);
+    }
+  }, []);
+
+  const checkAdmin = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError) throw authError;
+
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, username, is_admin')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError) throw profileError;
+
+      if (!profile?.is_admin) {
+        router.push('/');
+        return;
+      }
+
+      setIsAdmin(true);
+      await fetchVerifications();
+    } catch (err: any) {
+      console.error('Admin check failed:', err);
+      setError(err?.message || 'Failed to verify admin access');
+      setLoading(false);
+    }
+  }, [router, fetchVerifications]);
+
+  React.useEffect(() => {
+    checkAdmin();
+  }, [checkAdmin]);
+
+  const handleAction = async (
+    verification: Verification,
+    status: 'approved' | 'rejected',
+    reason?: string
+  ) => {
+    setProcessingId(verification.id);
+    setError(null);
+
+    try {
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError) throw authError;
+      if (!user) throw new Error('You must be logged in.');
+
+      const { error: verificationError } = await supabase
+        .from('seller_verifications')
+        .update({
+          status,
+          rejection_reason: reason || null,
+          reviewed_by: user.id,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq('id', verification.id);
+
+      if (verificationError) throw verificationError;
+
+      if (status === 'approved') {
+        const { error: profileUpdateError } = await supabase
+          .from('profiles')
+          .update({ is_verified_seller: true })
+          .eq('id', verification.user_id);
+
+        if (profileUpdateError) throw profileUpdateError;
+      }
+
+      setVerifications((prev) => prev.filter((v) => v.id !== verification.id));
+      setRejectionId(null);
+      setRejectionReason('');
+    } catch (err: any) {
+      console.error('Failed to process verification:', err);
+      setError(err?.message || 'Failed to process verification');
+    } finally {
+      setProcessingId(null);
     }
   };
 
-  if (loading || authLoading) {
+  if (!isAdmin && loading) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
+      <div className="min-h-screen bg-zinc-950 text-zinc-100 p-8 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
       </div>
     );
   }
 
-  if (status === 'approved') {
-    return (
-      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-20 h-20 bg-emerald-500/10 rounded-[2rem] flex items-center justify-center mb-8 border border-emerald-500/20">
-          <CheckCircle2 className="w-10 h-10 text-emerald-500" />
-        </div>
-        <h1 className="text-3xl font-black uppercase tracking-widest text-white mb-4">Verified Seller</h1>
-        <p className="text-zinc-500 text-center max-w-md mb-12 uppercase tracking-widest text-[10px] font-bold leading-relaxed">
-          Congratulations! Your identity has been verified. You can now list services and submit offers in the marketplace.
-        </p>
-        <Button variant="gold" onClick={() => router.push('/sell')}>Go to Seller Dashboard</Button>
-      </div>
-    );
-  }
-
-  if (status === 'pending') {
-    return (
-      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-20 h-20 bg-amber-500/10 rounded-[2rem] flex items-center justify-center mb-8 border border-amber-500/20">
-          <Clock className="w-10 h-10 text-amber-500" />
-        </div>
-        <h1 className="text-3xl font-black uppercase tracking-widest text-white mb-4">Verification Pending</h1>
-        <p className="text-zinc-500 text-center max-w-md mb-12 uppercase tracking-widest text-[10px] font-bold leading-relaxed">
-          Your application is currently being reviewed by our team. This process typically takes 24-48 hours. We will notify you once a decision is made.
-        </p>
-        <Button variant="outline" onClick={() => router.push('/dashboard')}>Back to Dashboard</Button>
-      </div>
-    );
-  }
-
-  if (status === 'rejected') {
-    return (
-      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-20 h-20 bg-red-500/10 rounded-[2rem] flex items-center justify-center mb-8 border border-red-500/20">
-          <AlertCircle className="w-10 h-10 text-red-500" />
-        </div>
-        <h1 className="text-3xl font-black uppercase tracking-widest text-white mb-4">Verification Rejected</h1>
-        <div className="bg-red-500/5 border border-red-500/10 rounded-2xl p-6 mb-12 max-w-md">
-          <p className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-2">Reason for Rejection</p>
-          <p className="text-zinc-400 text-xs font-bold leading-relaxed">
-            {rejectionReason || 'Your application did not meet our requirements. Please try again with clearer documents.'}
-          </p>
-        </div>
-        <Button variant="gold" onClick={() => setStatus('not_started')}>Try Again</Button>
-      </div>
-    );
-  }
+  if (!isAdmin) return null;
 
   return (
-    <div className="min-h-screen bg-zinc-950 pt-32 pb-20">
-      <div className="container mx-auto px-6">
-        <div className="max-w-3xl mx-auto">
-          <Link href="/sell" className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-amber-500 transition-colors mb-12 group">
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            Back to Selling
-          </Link>
-
-          <div className="space-y-4 mb-16">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20 shadow-lg">
-                <ShieldCheck className="w-6 h-6 text-amber-500" />
-              </div>
-              <h1 className="text-4xl font-black text-white uppercase tracking-tight">Seller Verification</h1>
-            </div>
-            <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">
-              Complete your identity verification to unlock full seller features and build trust with buyers.
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 p-8">
+      <div className="max-w-6xl mx-auto space-y-8">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <h1 className="text-3xl font-black uppercase tracking-tighter flex items-center">
+              <ShieldCheck className="w-8 h-8 mr-3 text-amber-500" />
+              Seller Verifications
+            </h1>
+            <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.3em]">
+              Review pending seller applications
             </p>
           </div>
 
-          {error && (
-            <div className="mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-3 text-red-500 text-[10px] font-black uppercase tracking-widest">
-              <AlertCircle className="w-4 h-4" />
-              {error}
-            </div>
-          )}
-
-          {success && (
-            <div className="mb-8 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center gap-3 text-emerald-500 text-[10px] font-black uppercase tracking-widest">
-              <CheckCircle2 className="w-4 h-4" />
-              Application submitted successfully! Redirecting...
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-12">
-            {/* Phone Number */}
-            <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-10 backdrop-blur-xl space-y-8">
-              <div className="space-y-3">
-                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em] ml-1">Phone Number</label>
-                <input 
-                  type="tel" 
-                  required
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="+1 (555) 000-0000"
-                  className="w-full bg-zinc-950/50 border border-zinc-800 rounded-2xl px-6 h-14 text-sm font-bold text-white focus:outline-none focus:border-amber-500/50 transition-colors"
-                />
-              </div>
-            </div>
-
-            {/* Document Type */}
-            <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-10 backdrop-blur-xl space-y-8">
-              <div className="space-y-4">
-                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em] ml-1">Document Type</label>
-                <div className="grid grid-cols-3 gap-4">
-                  {['ID', 'Driver\'s License', 'Passport'].map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => setDocumentType(type)}
-                      className={cn(
-                        "h-14 rounded-2xl border text-[10px] font-black uppercase tracking-widest transition-all",
-                        documentType === type 
-                          ? "bg-amber-500/10 border-amber-500 text-amber-500" 
-                          : "bg-zinc-950/50 border-zinc-800 text-zinc-500 hover:border-zinc-700"
-                      )}
-                    >
-                      {type}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Document Uploads */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* ID Front */}
-              <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-8 backdrop-blur-xl flex flex-col items-center text-center space-y-6">
-                <div className="w-16 h-16 bg-zinc-950 rounded-2xl flex items-center justify-center border border-white/5">
-                  <FileText className="w-8 h-8 text-zinc-700" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-[11px] font-black text-white uppercase tracking-widest">Government ID (Front)</h3>
-                  <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest">Passport or Driver&apos;s License</p>
-                </div>
-                <label className="w-full">
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'idFront')} />
-                  <div className={cn(
-                    "w-full h-12 rounded-xl border border-dashed flex items-center justify-center gap-2 cursor-pointer transition-all text-[10px] font-black uppercase tracking-widest",
-                    files.idFront ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500" : "bg-zinc-950/50 border-zinc-800 text-zinc-500 hover:border-amber-500/30 hover:text-amber-500"
-                  )}>
-                    {files.idFront ? <><CheckCircle2 className="w-4 h-4" /> Selected</> : <><Upload className="w-4 h-4" /> Upload Image</>}
-                  </div>
-                </label>
-              </div>
-
-              {/* ID Back */}
-              <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-8 backdrop-blur-xl flex flex-col items-center text-center space-y-6">
-                <div className="w-16 h-16 bg-zinc-950 rounded-2xl flex items-center justify-center border border-white/5">
-                  <FileText className="w-8 h-8 text-zinc-700" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-[11px] font-black text-white uppercase tracking-widest">Government ID (Back)</h3>
-                  <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest">Back side of your ID card</p>
-                </div>
-                <label className="w-full">
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'idBack')} />
-                  <div className={cn(
-                    "w-full h-12 rounded-xl border border-dashed flex items-center justify-center gap-2 cursor-pointer transition-all text-[10px] font-black uppercase tracking-widest",
-                    files.idBack ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500" : "bg-zinc-950/50 border-zinc-800 text-zinc-500 hover:border-amber-500/30 hover:text-amber-500"
-                  )}>
-                    {files.idBack ? <><CheckCircle2 className="w-4 h-4" /> Selected</> : <><Upload className="w-4 h-4" /> Upload Image</>}
-                  </div>
-                </label>
-              </div>
-
-              {/* Selfie */}
-              <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-8 backdrop-blur-xl flex flex-col items-center text-center space-y-6 md:col-span-2">
-                <div className="w-16 h-16 bg-zinc-950 rounded-2xl flex items-center justify-center border border-white/5">
-                  <Camera className="w-8 h-8 text-zinc-700" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-[11px] font-black text-white uppercase tracking-widest">Selfie with Note</h3>
-                  <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest max-w-xs mx-auto">
-                    Hold your ID and a handwritten note saying &quot;RSPLATFORM.GG&quot; with today&apos;s date.
-                  </p>
-                </div>
-                <label className="w-full max-w-sm">
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'selfie')} />
-                  <div className={cn(
-                    "w-full h-12 rounded-xl border border-dashed flex items-center justify-center gap-2 cursor-pointer transition-all text-[10px] font-black uppercase tracking-widest",
-                    files.selfie ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500" : "bg-zinc-950/50 border-zinc-800 text-zinc-500 hover:border-amber-500/30 hover:text-amber-500"
-                  )}>
-                    {files.selfie ? <><CheckCircle2 className="w-4 h-4" /> Selected</> : <><Upload className="w-4 h-4" /> Upload Selfie</>}
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            <Button 
-              type="submit"
-              disabled={submitting}
-              variant="gold" 
-              className="w-full h-16 rounded-2xl text-[11px] font-black uppercase tracking-[0.4em] shadow-lg shadow-amber-500/10 group"
-            >
-              {submitting ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <>
-                  Submit Application
-                  <CheckCircle2 className="w-4 h-4 ml-3 group-hover:scale-110 transition-transform" />
-                </>
-              )}
-            </Button>
-          </form>
-
-          <div className="mt-12 p-8 bg-zinc-900/20 border border-zinc-800/50 rounded-3xl flex items-start gap-4">
-            <AlertCircle className="w-5 h-5 text-zinc-600 shrink-0 mt-0.5" />
-            <div className="space-y-2">
-              <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Privacy Notice</p>
-              <p className="text-[9px] text-zinc-600 leading-relaxed font-medium">
-                Your personal documents are encrypted and stored securely. They are only used for identity verification purposes and are never shared with third parties or other users.
-              </p>
-            </div>
-          </div>
+          <Button
+            variant="ghost"
+            onClick={() => router.push('/sell')}
+            className="text-zinc-500 hover:text-zinc-100"
+          >
+            <ChevronLeft className="w-4 h-4 mr-2" />
+            Back to Sell
+          </Button>
         </div>
+
+        {error && (
+          <Card className="border border-red-500/20 bg-red-500/10">
+            <CardContent className="p-4 flex items-center gap-3 text-red-300 text-sm">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{error}</span>
+            </CardContent>
+          </Card>
+        )}
+
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
+          </div>
+        ) : verifications.length === 0 ? (
+          <Card className="premium-card p-20 text-center">
+            <div className="flex flex-col items-center space-y-4">
+              <div className="w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center border border-zinc-800">
+                <CheckCircle2 className="w-8 h-8 text-zinc-700" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-black uppercase tracking-widest">All Caught Up</h3>
+                <p className="text-zinc-500 text-xs font-medium">
+                  No pending verifications to review.
+                </p>
+              </div>
+            </div>
+          </Card>
+        ) : (
+          <div className="grid gap-6">
+            {verifications.map((v) => (
+              <Card key={v.id} className="premium-card overflow-hidden">
+                <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 rounded-xl overflow-hidden border border-zinc-800 bg-zinc-900 flex items-center justify-center">
+                      {v.profiles?.avatar_url ? (
+                        <Image
+                          src={v.profiles.avatar_url}
+                          alt={v.profiles?.username || 'User'}
+                          width={48}
+                          height={48}
+                          className="object-cover w-full h-full"
+                        />
+                      ) : (
+                        <User className="w-5 h-5 text-zinc-500" />
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="font-black uppercase tracking-widest text-sm">
+                        {v.profiles?.username || 'Unknown User'}
+                      </h3>
+                      <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">
+                        User ID: {v.user_id.slice(0, 8)}...
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                    <Clock className="w-3 h-3" />
+                    <span>Submitted {new Date(v.created_at).toLocaleDateString()}</span>
+                  </div>
+                </div>
+
+                <div className="p-6 grid md:grid-cols-3 gap-8">
+                  <div className="space-y-6">
+                    <div className="space-y-4">
+                      <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-500 flex items-center">
+                        <User className="w-3 h-3 mr-2" />
+                        Contact Info
+                      </h4>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-[11px] gap-4">
+                          <span className="text-zinc-500 font-black uppercase tracking-widest flex items-center">
+                            <Phone className="w-3 h-3 mr-2" />
+                            Phone
+                          </span>
+                          <span className="font-medium text-right">{v.phone_number}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[11px] gap-4">
+                          <span className="text-zinc-500 font-black uppercase tracking-widest flex items-center">
+                            <FileText className="w-3 h-3 mr-2" />
+                            Document
+                          </span>
+                          <span className="font-medium uppercase text-right">{v.document_type}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col space-y-3 pt-4 border-t border-white/5">
+                      {rejectionId === v.id ? (
+                        <div className="space-y-3">
+                          <textarea
+                            placeholder="Enter rejection reason..."
+                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-xs focus:outline-none focus:border-amber-500/50"
+                            value={rejectionReason}
+                            onChange={(e) => setRejectionReason(e.target.value)}
+                          />
+                          <div className="flex gap-2">
+                            <Button
+                              variant="destructive"
+                              className="flex-1 h-10 rounded-xl font-black uppercase tracking-widest text-[10px]"
+                              onClick={() => handleAction(v, 'rejected', rejectionReason)}
+                              disabled={!rejectionReason || processingId === v.id}
+                            >
+                              Confirm Reject
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              className="flex-1 h-10 rounded-xl font-black uppercase tracking-widest text-[10px]"
+                              onClick={() => {
+                                setRejectionId(null);
+                                setRejectionReason('');
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <Button
+                            variant="gold"
+                            className="w-full h-12 rounded-xl font-black uppercase tracking-widest text-[10px]"
+                            disabled={processingId === v.id}
+                            onClick={() => handleAction(v, 'approved')}
+                          >
+                            {processingId === v.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              'Approve Seller'
+                            )}
+                          </Button>
+
+                          <Button
+                            variant="ghost"
+                            className="w-full h-12 rounded-xl border border-red-500/20 text-red-500 hover:bg-red-500/10 font-black uppercase tracking-widest text-[10px]"
+                            disabled={processingId === v.id}
+                            onClick={() => setRejectionId(v.id)}
+                          >
+                            Reject Application
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-2 grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">
+                        ID Front
+                      </p>
+                      <div className="aspect-[4/3] relative rounded-xl overflow-hidden border border-zinc-800 bg-black group">
+                        {v.id_front_signed_url ? (
+                          <>
+                            <Image
+                              src={v.id_front_signed_url}
+                              alt="ID Front"
+                              fill
+                              className="object-contain"
+                            />
+                            <a
+                              href={v.id_front_signed_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                            >
+                              <ExternalLink className="w-6 h-6 text-white" />
+                            </a>
+                          </>
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center text-zinc-600 text-xs">
+                            Failed to load image
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">
+                        ID Back
+                      </p>
+                      <div className="aspect-[4/3] relative rounded-xl overflow-hidden border border-zinc-800 bg-black group">
+                        {v.id_back_signed_url ? (
+                          <>
+                            <Image
+                              src={v.id_back_signed_url}
+                              alt="ID Back"
+                              fill
+                              className="object-contain"
+                            />
+                            <a
+                              href={v.id_back_signed_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                            >
+                              <ExternalLink className="w-6 h-6 text-white" />
+                            </a>
+                          </>
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center text-zinc-600 text-xs">
+                            Failed to load image
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="col-span-2 space-y-2">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">
+                        Selfie Verification
+                      </p>
+                      <div className="aspect-video relative rounded-xl overflow-hidden border border-zinc-800 bg-black group">
+                        {v.selfie_signed_url ? (
+                          <>
+                            <Image
+                              src={v.selfie_signed_url}
+                              alt="Selfie"
+                              fill
+                              className="object-contain"
+                            />
+                            <a
+                              href={v.selfie_signed_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                            >
+                              <ExternalLink className="w-6 h-6 text-white" />
+                            </a>
+                          </>
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center text-zinc-600 text-xs">
+                            Failed to load image
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
