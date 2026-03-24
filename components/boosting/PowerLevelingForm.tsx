@@ -22,47 +22,51 @@ interface PowerLevelingFormProps {
 
 function CustomSkillSelect({ value, onChange }: { value: string, onChange: (val: string) => void }) {
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const [dropdownStyle, setDropdownStyle] = useState({});
+  const dropdownContentRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState<{ top: number; left: number; width: number } | null>(null);
+
+  const updateCoords = () => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setCoords({
+        top: rect.bottom + 8,
+        left: rect.left,
+        width: rect.width,
+      });
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const isInsideButton = buttonRef.current?.contains(target);
+      const isInsideDropdown = dropdownContentRef.current?.contains(target);
+      
+      if (!isInsideButton && !isInsideDropdown) {
         setIsOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
-  useEffect(() => {
-    if (isOpen && buttonRef.current) {
-      const updatePosition = () => {
-        if (buttonRef.current) {
-          const rect = buttonRef.current.getBoundingClientRect();
-          setDropdownStyle({
-            top: rect.bottom + window.scrollY + 8,
-            left: rect.left + window.scrollX,
-            width: rect.width,
-          });
-        }
-      };
-      updatePosition();
-      window.addEventListener('resize', updatePosition);
-      window.addEventListener('scroll', updatePosition, true);
-      return () => {
-        window.removeEventListener('resize', updatePosition);
-        window.removeEventListener('scroll', updatePosition, true);
-      };
+    if (isOpen) {
+      updateCoords();
+      document.addEventListener('mousedown', handleClickOutside);
+      window.addEventListener('resize', updateCoords);
+      window.addEventListener('scroll', updateCoords, true);
     }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('resize', updateCoords);
+      window.removeEventListener('scroll', updateCoords, true);
+    };
   }, [isOpen]);
 
   const selectedSkill = OSRS_SKILLS.find(s => s.id === value);
   const IconComponent = (Icons as any)[selectedSkill?.icon || 'Sword'];
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative">
       <button
         ref={buttonRef}
         type="button"
@@ -82,17 +86,25 @@ function CustomSkillSelect({ value, onChange }: { value: string, onChange: (val:
         )} />
       </button>
 
-      <AnimatePresence>
-        {isOpen && typeof document !== 'undefined' && createPortal(
-          <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            transition={{ duration: 0.15 }}
-            style={dropdownStyle}
-            className="absolute z-[9999] bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden"
-          >
-            <div className="max-h-60 overflow-y-auto custom-scrollbar p-1">
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {isOpen && coords && (
+            <motion.div
+              ref={dropdownContentRef}
+              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+              transition={{ duration: 0.15 }}
+              style={{
+                position: 'fixed',
+                top: coords.top,
+                left: coords.left,
+                width: coords.width,
+                zIndex: 99999,
+              }}
+              className="bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden"
+            >
+              <div className="max-h-[400px] overflow-y-auto custom-scrollbar p-1">
               {OSRS_SKILLS.map((skill) => {
                 const SkillIcon = (Icons as any)[skill.icon || 'Sword'];
                 const isSelected = skill.id === value;
@@ -121,12 +133,13 @@ function CustomSkillSelect({ value, onChange }: { value: string, onChange: (val:
                 );
               })}
             </div>
-          </motion.div>,
-          document.body
+          </motion.div>
         )}
-      </AnimatePresence>
-    </div>
-  );
+      </AnimatePresence>,
+      document.body
+    )}
+  </div>
+);
 }
 
 export function PowerLevelingForm({ onUpdate }: PowerLevelingFormProps) {
