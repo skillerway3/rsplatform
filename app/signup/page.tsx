@@ -10,6 +10,7 @@ import {
   ArrowRight, 
   Github, 
   Chrome, 
+  Facebook,
   ChevronLeft,
   Zap,
   CheckCircle2,
@@ -31,6 +32,20 @@ export default function SignupPage() {
   const [agree, setAgree] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+
+  const handleSocialLogin = async (provider: 'google' | 'facebook') => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+        },
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      setError(err.message || `Failed to sign in with ${provider}`);
+    }
+  };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,21 +167,32 @@ export default function SignupPage() {
                 </div>
               )}
 
-              <Button 
-                type="submit"
-                disabled={loading}
-                variant="gold" 
-                className="w-full h-14 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-amber-500/20"
-              >
-                {loading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <>
-                    Create Account
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </>
-                )}
-              </Button>
+              <div className="space-y-4">
+                <Button 
+                  type="submit"
+                  disabled={loading}
+                  variant="gold" 
+                  className="w-full h-14 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-amber-500/20"
+                >
+                  {loading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      Create Account
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </>
+                  )}
+                </Button>
+                <Link href="/login" className="block">
+                  <Button 
+                    type="button"
+                    variant="ghost" 
+                    className="w-full h-14 rounded-xl font-black uppercase tracking-widest text-[10px] border border-zinc-800 text-zinc-400 hover:text-zinc-100"
+                  >
+                    Log In
+                  </Button>
+                </Link>
+              </div>
             </form>
 
             <div className="relative">
@@ -177,11 +203,19 @@ export default function SignupPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <Button variant="ghost" className="h-12 rounded-xl border border-zinc-800 text-[9px] font-black uppercase tracking-widest text-zinc-500 hover:text-zinc-100">
-                <Github className="w-4 h-4 mr-2" />
-                Github
+              <Button 
+                variant="ghost" 
+                onClick={() => handleSocialLogin('facebook')}
+                className="h-12 rounded-xl border border-zinc-800 text-[9px] font-black uppercase tracking-widest text-zinc-500 hover:text-zinc-100"
+              >
+                <Facebook className="w-4 h-4 mr-2" />
+                Facebook
               </Button>
-              <Button variant="ghost" className="h-12 rounded-xl border border-zinc-800 text-[9px] font-black uppercase tracking-widest text-zinc-500 hover:text-zinc-100">
+              <Button 
+                variant="ghost" 
+                onClick={() => handleSocialLogin('google')}
+                className="h-12 rounded-xl border border-zinc-800 text-[9px] font-black uppercase tracking-widest text-zinc-500 hover:text-zinc-100"
+              >
                 <Chrome className="w-4 h-4 mr-2" />
                 Google
               </Button>
