@@ -90,7 +90,7 @@ export function SellForm() {
       let sectionId: SectionId = 'items';
       if (data.categoryId === 'gold') sectionId = 'currency';
       else if (data.categoryId === 'accounts') sectionId = 'accounts';
-      else if (data.categoryId === 'services') sectionId = 'boosting';
+      else if (data.categoryId === 'boosting') sectionId = 'boosting';
       
       setFormData(prev => ({ ...prev, ...data, sectionId }));
     } else {

@@ -2,7 +2,7 @@ export type GameId = 'OSRS' | 'RS3' | 'RSPS';
 
 export type SectionId = 'currency' | 'accounts' | 'items' | 'boosting';
 
-export type CategoryId = 'gold' | 'items' | 'accounts' | 'services';
+export type CategoryId = 'gold' | 'items' | 'accounts' | 'boosting';
 
 export interface Game {
   id: GameId;

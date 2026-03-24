@@ -10,7 +10,7 @@ export const CATEGORIES: Category[] = [
   { id: 'gold', name: 'Currency', icon: 'Coins' },
   { id: 'items', name: 'Items', icon: 'Package' },
   { id: 'accounts', name: 'Accounts', icon: 'User' },
-  { id: 'services', name: 'Boosting', icon: 'Wrench' },
+  { id: 'boosting', name: 'Boosting', icon: 'Wrench' },
 ];
 
 export const USERS: User[] = [

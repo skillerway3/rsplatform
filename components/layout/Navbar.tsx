@@ -378,69 +378,52 @@ export function Navbar() {
               </Link>
 
               <div className="pt-8 flex flex-col space-y-4">
-                {user ? (
-                  <>
-                    <div className="grid grid-cols-2 gap-4">
-                      <Link 
-                        href="/dashboard/requests" 
-                        className="flex items-center justify-center py-4 bg-zinc-900 rounded-xl text-zinc-400 font-black uppercase tracking-widest text-[10px] border border-white/5"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        My Requests
-                      </Link>
-                      <Link 
-                        href="/dashboard/sales" 
-                        className="flex items-center justify-center py-4 bg-zinc-900 rounded-xl text-zinc-400 font-black uppercase tracking-widest text-[10px] border border-white/5"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        Sales
-                      </Link>
-                      <Link 
-                        href="/messages" 
-                        className="flex items-center justify-center py-4 bg-zinc-900 rounded-xl text-zinc-400 font-black uppercase tracking-widest text-[10px] border border-white/5"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        Messages
-                      </Link>
-                      <Link 
-                        href="/profile" 
-                        className="flex items-center justify-center py-4 bg-zinc-900 rounded-xl text-zinc-400 font-black uppercase tracking-widest text-[10px] border border-white/5"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        Profile
-                      </Link>
-                    </div>
-                    <div className="flex gap-4">
-                      <Link href="/sell" className="flex-1">
-                        <Button variant="gold" className="w-full py-7 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-amber-500/10">
-                          List Item
-                        </Button>
-                      </Link>
-                      <button 
-                        onClick={() => {
-                          signOut();
-                          setIsMobileMenuOpen(false);
-                        }}
-                        className="px-6 py-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-500 font-black uppercase tracking-widest text-[10px] hover:bg-red-500/20 transition-all"
-                      >
-                        <LogOut className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex flex-col gap-4">
-                    <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
-                      <Button variant="outline" className="w-full py-7 rounded-2xl font-black uppercase tracking-widest text-xs border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-900">
-                        Log In
-                      </Button>
-                    </Link>
-                    <Link href="/signup" onClick={() => setIsMobileMenuOpen(false)}>
-                      <Button variant="gold" className="w-full py-7 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-amber-500/10">
-                        Sign Up
-                      </Button>
-                    </Link>
-                  </div>
-                )}
+                <div className="grid grid-cols-2 gap-4">
+                  <Link 
+                    href="/dashboard/requests" 
+                    className="flex items-center justify-center py-4 bg-zinc-900 rounded-xl text-zinc-400 font-black uppercase tracking-widest text-[10px] border border-white/5"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    My Requests
+                  </Link>
+                  <Link 
+                    href="/dashboard/sales" 
+                    className="flex items-center justify-center py-4 bg-zinc-900 rounded-xl text-zinc-400 font-black uppercase tracking-widest text-[10px] border border-white/5"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Sales
+                  </Link>
+                  <Link 
+                    href="/messages" 
+                    className="flex items-center justify-center py-4 bg-zinc-900 rounded-xl text-zinc-400 font-black uppercase tracking-widest text-[10px] border border-white/5"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Messages
+                  </Link>
+                  <Link 
+                    href="/profile" 
+                    className="flex items-center justify-center py-4 bg-zinc-900 rounded-xl text-zinc-400 font-black uppercase tracking-widest text-[10px] border border-white/5"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Profile
+                  </Link>
+                </div>
+                <div className="flex gap-4">
+                  <Link href="/sell" className="flex-1">
+                    <Button variant="gold" className="w-full py-7 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-amber-500/10">
+                      List Item
+                    </Button>
+                  </Link>
+                  <button 
+                    onClick={() => {
+                      signOut();
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="px-6 py-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-500 font-black uppercase tracking-widest text-[10px] hover:bg-red-500/20 transition-all"
+                  >
+                    <LogOut className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
             </div>
           </motion.div>

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 import { Plus, Trash2, ChevronDown, Info, Upload, FileText, Check } from 'lucide-react';
 import { OSRS_SKILLS } from '@/data/boosting/osrs-skills';
@@ -22,6 +23,8 @@ interface PowerLevelingFormProps {
 function CustomSkillSelect({ value, onChange }: { value: string, onChange: (val: string) => void }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [dropdownStyle, setDropdownStyle] = useState({});
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -33,12 +36,35 @@ function CustomSkillSelect({ value, onChange }: { value: string, onChange: (val:
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const updatePosition = () => {
+        if (buttonRef.current) {
+          const rect = buttonRef.current.getBoundingClientRect();
+          setDropdownStyle({
+            top: rect.bottom + window.scrollY + 8,
+            left: rect.left + window.scrollX,
+            width: rect.width,
+          });
+        }
+      };
+      updatePosition();
+      window.addEventListener('resize', updatePosition);
+      window.addEventListener('scroll', updatePosition, true);
+      return () => {
+        window.removeEventListener('resize', updatePosition);
+        window.removeEventListener('scroll', updatePosition, true);
+      };
+    }
+  }, [isOpen]);
+
   const selectedSkill = OSRS_SKILLS.find(s => s.id === value);
   const IconComponent = (Icons as any)[selectedSkill?.icon || 'Sword'];
 
   return (
     <div className="relative" ref={dropdownRef}>
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
@@ -57,13 +83,14 @@ function CustomSkillSelect({ value, onChange }: { value: string, onChange: (val:
       </button>
 
       <AnimatePresence>
-        {isOpen && (
+        {isOpen && typeof document !== 'undefined' && createPortal(
           <motion.div
             initial={{ opacity: 0, y: 10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="absolute z-50 w-full mt-2 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden"
+            style={dropdownStyle}
+            className="absolute z-[9999] bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden"
           >
             <div className="max-h-60 overflow-y-auto custom-scrollbar p-1">
               {OSRS_SKILLS.map((skill) => {
@@ -94,7 +121,8 @@ function CustomSkillSelect({ value, onChange }: { value: string, onChange: (val:
                 );
               })}
             </div>
-          </motion.div>
+          </motion.div>,
+          document.body
         )}
       </AnimatePresence>
     </div>
@@ -167,15 +195,15 @@ export function PowerLevelingForm({ onUpdate }: PowerLevelingFormProps) {
           </div>
 
           <div className="space-y-4">
-            {rows.map((row) => {
+            {rows.map((row, index) => {
               const error = getRowError(row);
               const skill = OSRS_SKILLS.find(s => s.id === row.skillId);
               const IconComponent = (Icons as any)[skill?.icon || 'Sword'];
 
               return (
-                <div key={row.id} className="group relative space-y-2">
+                <div key={row.id} className="group relative space-y-2" style={{ zIndex: rows.length - index }}>
                   <div className={cn(
-                    "grid grid-cols-1 sm:grid-cols-12 gap-4 items-end p-5 rounded-2xl transition-all duration-300 relative overflow-hidden",
+                    "grid grid-cols-1 sm:grid-cols-12 gap-4 items-end p-5 rounded-2xl transition-all duration-300 relative",
                     error 
                       ? "bg-red-500/[0.02] border border-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.05)]" 
                       : "bg-zinc-900/30 border border-zinc-800/50 hover:border-zinc-700/50 hover:bg-zinc-900/50"
@@ -200,8 +228,8 @@ export function PowerLevelingForm({ onUpdate }: PowerLevelingFormProps) {
                           value={row.currentLevel}
                           onChange={(e) => updateRow(row.id, 'currentLevel', parseInt(e.target.value))}
                           className={cn(
-                            "w-full h-12 bg-zinc-950/50 border rounded-xl px-4 text-[13px] font-bold transition-all shadow-inner",
-                            !error ? "border-zinc-800 focus:border-amber-500/50 text-amber-500" : "border-red-500/30 focus:border-red-500/50 text-red-500"
+                            "w-full h-12 bg-zinc-950/80 border rounded-xl px-4 text-[14px] font-black transition-all duration-300 shadow-inner focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:bg-zinc-900 hover:bg-zinc-900/80 hover:border-zinc-700/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+                            !error ? "border-zinc-800 focus:border-amber-500/50 text-amber-500" : "border-red-500/30 focus:border-red-500/50 text-red-500 focus:ring-red-500/20"
                           )}
                           placeholder="1"
                         />
@@ -218,8 +246,8 @@ export function PowerLevelingForm({ onUpdate }: PowerLevelingFormProps) {
                           value={row.desiredLevel}
                           onChange={(e) => updateRow(row.id, 'desiredLevel', parseInt(e.target.value))}
                           className={cn(
-                            "w-full h-12 bg-zinc-950/50 border rounded-xl px-4 text-[13px] font-bold transition-all shadow-inner",
-                            !error ? "border-zinc-800 focus:border-amber-500/50 text-amber-500" : "border-red-500/30 focus:border-red-500/50 text-red-500"
+                            "w-full h-12 bg-zinc-950/80 border rounded-xl px-4 text-[14px] font-black transition-all duration-300 shadow-inner focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:bg-zinc-900 hover:bg-zinc-900/80 hover:border-zinc-700/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+                            !error ? "border-zinc-800 focus:border-amber-500/50 text-amber-500" : "border-red-500/30 focus:border-red-500/50 text-red-500 focus:ring-red-500/20"
                           )}
                           placeholder="99"
                         />

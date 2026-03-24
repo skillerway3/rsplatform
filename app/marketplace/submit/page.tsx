@@ -101,11 +101,11 @@ export default function SubmitRequestPage() {
 
       // Redirect immediately to avoid "freeze" feeling
       try {
-        router.replace(`/orders/${data.id}`);
+        router.push(`/marketplace/requests/${data.id}`);
       } catch (routerErr) {
         console.error('Redirection error:', routerErr);
         // Fallback if router fails
-        window.location.href = `/orders/${data.id}`;
+        window.location.href = `/marketplace/requests/${data.id}`;
       }
     } catch (err: any) {
       console.error('Submit request error:', err);

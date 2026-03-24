@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { BoostingTabs } from './BoostingTabs';
 import { ServiceFormLayout } from './ServiceFormLayout';
@@ -63,9 +63,9 @@ function BoostingContent() {
     setOptions(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleUpdateOrder = (summary: { service: string; details: string[] }) => {
+  const handleUpdateOrder = useCallback((summary: { service: string; details: string[] }) => {
     setOrderSummary(summary);
-  };
+  }, []);
 
   const isOSRS = !gameParam || gameParam.toUpperCase() === 'OSRS';
 

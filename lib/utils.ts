@@ -28,7 +28,7 @@ export function getListingSection(listing: Listing): SectionId | null {
   if (listing.categoryId === 'gold') return 'currency';
   if (listing.categoryId === 'accounts') return 'accounts';
   if (listing.categoryId === 'items') return 'items';
-  if (listing.categoryId === 'services') return 'boosting';
+  if (listing.categoryId === 'boosting') return 'boosting';
 
   // Infer from title/description keywords
   const text = (listing.title + ' ' + listing.description).toLowerCase();

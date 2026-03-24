@@ -189,9 +189,11 @@ function BrowseContent() {
     if (isFilterOpen) setIsFilterOpen(false);
   };
 
-  const isAccountSection = selectedCategory === 'accounts' || sectionParam?.toLowerCase() === 'accounts';
-  const isBoostingSection = selectedCategory === 'services' || sectionParam?.toLowerCase() === 'boosting';
+  const isAccountSection =
+  selectedCategory === 'accounts' || sectionParam?.toLowerCase() === 'accounts';
 
+const isBoostingSection =
+  selectedCategory === 'boosting' || sectionParam?.toLowerCase() === 'boosting';
   const clearAccountFilters = () => {
     setAccountFilters({
       search: '',

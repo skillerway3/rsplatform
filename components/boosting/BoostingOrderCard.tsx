@@ -53,11 +53,11 @@ export function BoostingOrderCard({ options, onOptionChange, summary, className 
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 24); // Default 24h
 
-      const { data, error: submitError } = await supabase
+      const { data, error: supabaseError } = await supabase
         .from('buyer_requests')
         .insert({
           buyer_id: user.id,
-          category: summary.category || 'Boosting',
+          category: summary.category || 'boosting',
           game: summary.game || 'OSRS',
           title: `Request for ${summary.service}`,
           description: `Service: ${summary.service}\nDetails: ${summary.details.join(', ')}\nOptions: ${Object.entries(options).filter(([_, v]) => v).map(([k]) => k).join(', ')}`,
@@ -67,26 +67,26 @@ export function BoostingOrderCard({ options, onOptionChange, summary, className 
         .select()
         .single();
 
-      if (submitError) {
-        console.error('Supabase error submitting request:', submitError);
-        throw submitError;
+      if (supabaseError) {
+        console.error('Supabase error submitting request:', supabaseError);
+        throw new Error(supabaseError.message || 'Failed to submit request');
       }
 
       if (!data) {
         throw new Error('No data returned from request creation');
       }
 
-      console.log('Request submitted successfully, redirecting to:', `/orders/${data.id}`);
+      console.log('Request submitted successfully, redirecting to:', `/marketplace/requests/${data.id}`);
       
       try {
-        await router.replace(`/orders/${data.id}`);
+        await router.push(`/marketplace/requests/${data.id}`);
       } catch (redirectError) {
         console.error('Router redirect failed, falling back to window.location:', redirectError);
-        window.location.href = `/orders/${data.id}`;
+        window.location.href = `/marketplace/requests/${data.id}`;
       }
     } catch (err: any) {
       console.error('Error submitting request:', err);
-      setError(err.message || 'Failed to submit request. Please try again.');
+      setError(err.message || 'An unexpected error occurred. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -182,15 +182,14 @@ export function BoostingOrderCard({ options, onOptionChange, summary, className 
           </div>
         </div>
 
-        {/* Error Message */}
-        {error && (
-          <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-[11px] font-bold uppercase tracking-widest text-center">
-            {error}
-          </div>
-        )}
-
         {/* CTA */}
         <div className="space-y-6">
+          {error && (
+            <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-medium flex items-start gap-3">
+              <Info className="w-5 h-5 shrink-0 mt-0.5" />
+              <p>{error}</p>
+            </div>
+          )}
           <Button 
             disabled={summary.details.length === 0 || isSubmitting}
             onClick={handleSubmit}

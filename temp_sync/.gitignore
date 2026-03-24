@@ -1,6 +1,0 @@
-.next/
-node_modules/
-*.zip
-.env*
-!.env.example
-.vercel

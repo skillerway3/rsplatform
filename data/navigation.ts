@@ -41,5 +41,5 @@ export const SECTION_TO_CATEGORY: Record<string, string> = {
   currency: 'gold',
   accounts: 'accounts',
   items: 'items',
-  boosting: 'services',
+  boosting: 'boosting',
 };
