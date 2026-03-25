@@ -32,36 +32,23 @@ export default function DashboardPage() {
 
     const fetchDashboardData = async () => {
       try {
-        // Fetch user's profile
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
+        // Parallelize fetches for better performance
+        const [
+          { data: profileData },
+          { data: listings },
+          { data: orders },
+          { data: sales },
+          { data: requests }
+        ] = await Promise.all([
+          supabase.from('profiles').select('*').eq('id', user.id).single(),
+          supabase.from('listings').select('*').eq('seller_id', user.id),
+          supabase.from('orders').select('*, listings(*)').eq('buyer_id', user.id).order('created_at', { ascending: false }).limit(10),
+          supabase.from('orders').select('*, listings(*)').eq('seller_id', user.id).order('created_at', { ascending: false }).limit(10),
+          supabase.from('buyer_requests').select('*').eq('buyer_id', user.id)
+        ]);
         
         setProfile(profileData);
-
-        // Fetch user's listings (if they are a seller)
-        const { data: listings } = await supabase
-          .from('listings')
-          .select('*')
-          .eq('seller_id', user.id);
-        
-        // Fetch user's orders (as buyer)
-        const { data: orders } = await supabase
-          .from('orders')
-          .select('*, listings(*)')
-          .eq('buyer_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(10);
-
-        // Fetch user's sales (as seller) for revenue and pending count
-        const { data: sales } = await supabase
-          .from('orders')
-          .select('*, listings(*)')
-          .eq('seller_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(10);
+        setUserListings(listings || []);
 
         const completedSales = sales?.filter(s => s.status === 'completed') || [];
         const pendingSales = sales?.filter(s => s.status === 'pending' || s.status === 'processing').length || 0;
@@ -86,14 +73,6 @@ export default function DashboardPage() {
         .slice(0, 5);
 
         setRecentOrders(allActivities);
-        
-        // Fetch user's requests
-        const { data: requests } = await supabase
-          .from('buyer_requests')
-          .select('*')
-          .eq('buyer_id', user.id);
-
-        setUserListings(listings || []);
         
         const totalRev = completedSales.reduce((acc, sale) => acc + (sale.total_price || 0), 0) || 0;
         
@@ -167,7 +146,7 @@ export default function DashboardPage() {
       <div className="container mx-auto px-6 relative z-10">
         <div className="max-w-7xl mx-auto space-y-16">
           <DashboardHeader 
-            username={user.email?.split('@')[0] || 'User'} 
+            username={profile?.username || 'Member'} 
             isVerified={profile?.is_verified_seller}
             isTrusted={profile?.is_trusted_seller}
           />

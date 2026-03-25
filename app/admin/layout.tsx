@@ -43,8 +43,11 @@ const ADMIN_NAV = [
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { profile, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
+
+  const isAdminEmail = user?.email === 'skillerway100@gmail.com';
+  const isAdminRole = profile?.role === 'admin';
 
   if (loading) {
     return (
@@ -54,7 +57,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  if (!profile || profile.role !== 'admin') {
+  if (!user || (!isAdminEmail && !isAdminRole)) {
     return (
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6 text-center">
         <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mb-6 border border-red-500/20">

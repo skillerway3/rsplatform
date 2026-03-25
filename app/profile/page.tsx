@@ -41,6 +41,7 @@ interface Profile {
   is_trusted_seller: boolean;
   created_at: string;
   username_updated_at?: string;
+  role: string;
 }
 
 export default function ProfilePage() {
@@ -136,19 +137,25 @@ export default function ProfilePage() {
 
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}-${Math.random()}.${fileExt}`;
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
       const filePath = `${user.id}/${fileName}`;
 
+      // Upload to avatars bucket
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file);
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
 
       if (uploadError) throw uploadError;
 
+      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
         .getPublicUrl(filePath);
 
+      // Update profile
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ avatar_url: publicUrl })
@@ -159,12 +166,11 @@ export default function ProfilePage() {
       setProfile(prev => prev ? ({ ...prev, avatar_url: publicUrl }) : null);
       setSuccess(true);
       
-      // Force refresh of any components listening to auth state if they use profile data
-      // In this app, Navbar uses useAuth which might need a refresh or we just rely on state propagation
+      // Force refresh
       router.refresh();
     } catch (err: any) {
       console.error('Error uploading avatar:', err);
-      setError('Failed to upload avatar');
+      setError('Failed to upload avatar: ' + (err.message || 'Unknown error'));
     } finally {
       setUploading(false);
     }
@@ -236,7 +242,7 @@ export default function ProfilePage() {
                 </div>
                 <div className="space-y-1">
                   <h2 className="text-xl font-black text-white uppercase tracking-tight">{profile?.username || 'Member'}</h2>
-                  <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">{user?.email}</p>
+                  <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">{profile?.role === 'admin' ? 'Administrator' : 'Member'}</p>
                 </div>
 
                 <div className="w-full h-px bg-white/5 my-8" />
@@ -292,8 +298,8 @@ export default function ProfilePage() {
                       <Mail className="w-4 h-4 text-zinc-600" />
                     </div>
                     <div>
-                      <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Email Address</p>
-                      <p className="text-[11px] font-bold text-zinc-100 truncate max-w-[150px]">{user?.email}</p>
+                      <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Account Status</p>
+                      <p className="text-[11px] font-bold text-zinc-100 truncate max-w-[150px]">{profile?.role === 'admin' ? 'Administrator' : 'Verified Member'}</p>
                     </div>
                   </div>
                 </div>
@@ -369,13 +375,10 @@ export default function ProfilePage() {
                     </div>
 
                     <div className="space-y-3">
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em] ml-1">Email (Read Only)</label>
-                      <input 
-                        type="email" 
-                        disabled
-                        value={user?.email || ''}
-                        className="w-full bg-zinc-950/30 border border-zinc-800/50 rounded-2xl px-6 h-14 text-sm font-bold text-zinc-500 cursor-not-allowed"
-                      />
+                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em] ml-1">Account Status</label>
+                      <div className="w-full bg-zinc-950/30 border border-zinc-800/50 rounded-2xl px-6 h-14 flex items-center text-sm font-bold text-zinc-500 cursor-not-allowed">
+                        {profile?.role === 'admin' ? 'Administrator' : 'Verified Member'}
+                      </div>
                     </div>
                   </div>
 

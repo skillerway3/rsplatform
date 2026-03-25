@@ -36,7 +36,7 @@ interface Message {
   };
 }
 
-type ChatStep = 'initial' | 'buyer' | 'seller' | 'faq' | 'chat' | 'success' | 'guest_form';
+type ChatStep = 'welcome' | 'initial' | 'buyer' | 'seller' | 'faq' | 'chat' | 'success' | 'guest_form';
 
 interface FAQItem {
   question: string;
@@ -82,7 +82,7 @@ const SELLER_FAQS: Record<string, FAQItem[]> = {
 export function LiveChatWidget() {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-  const [step, setStep] = useState<ChatStep>('initial');
+  const [step, setStep] = useState<ChatStep>('welcome');
   const [parentStep, setParentStep] = useState<'buyer' | 'seller' | null>(null);
   const [category, setCategory] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -98,6 +98,20 @@ export function LiveChatWidget() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, step]);
+
+  const [guestSessionId, setGuestSessionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Initialize guest session ID if not logged in
+    if (!user) {
+      let gid = localStorage.getItem('rs_guest_session_id');
+      if (!gid) {
+        gid = `guest_${Math.random().toString(36).substring(2, 15)}`;
+        localStorage.setItem('rs_guest_session_id', gid);
+      }
+      setGuestSessionId(gid);
+    }
+  }, [user]);
 
   // Subscribe to messages if thread exists
   useEffect(() => {
@@ -132,7 +146,7 @@ export function LiveChatWidget() {
   }, [threadId, step]);
 
   const resetChat = () => {
-    setStep('initial');
+    setStep('welcome');
     setCategory(null);
     setInputText('');
   };
@@ -147,24 +161,29 @@ export function LiveChatWidget() {
 
     setLoading(true);
     try {
-      // Check for existing open thread
-      let query = supabase
-        .from('support_threads')
-        .select('id')
-        .eq('status', 'open');
-      
+      let currentThreadId: string | null = null;
+
       if (user) {
-        query = query.eq('user_id', user.id);
+        const { data: existingThread } = await supabase
+          .from('support_threads')
+          .select('id')
+          .eq('status', 'open')
+          .eq('user_id', user.id)
+          .order('last_message_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        currentThreadId = existingThread?.id;
       } else {
-        query = query.eq('guest_email', guestInfo.email);
+        // Use RPC for guest to check for open thread
+        const { data: guestThreadId, error: rpcError } = await supabase.rpc('get_guest_open_thread', {
+          p_guest_email: guestInfo.email,
+          p_guest_session_id: guestSessionId
+        });
+
+        if (rpcError) throw rpcError;
+        currentThreadId = guestThreadId;
       }
-
-      const { data: existingThread } = await query
-        .order('last_message_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      let currentThreadId = existingThread?.id;
 
       if (!currentThreadId) {
         const { data: newThread, error: threadError } = await supabase
@@ -188,13 +207,35 @@ export function LiveChatWidget() {
       setThreadId(currentThreadId);
       
       // Fetch messages
-      const { data: msgs } = await supabase
-        .from('support_messages')
-        .select(`*, sender:profiles!support_messages_sender_id_fkey(username, avatar_url)`)
-        .eq('thread_id', currentThreadId)
-        .order('created_at', { ascending: true });
+      if (user) {
+        const { data: msgs } = await supabase
+          .from('support_messages')
+          .select(`*, sender:profiles!support_messages_sender_id_fkey(username, avatar_url)`)
+          .eq('thread_id', currentThreadId)
+          .order('created_at', { ascending: true });
 
-      setMessages(msgs || []);
+        setMessages(msgs || []);
+      } else {
+        // Use RPC for guest messages
+        const { data: msgs, error: msgsError } = await supabase.rpc('get_guest_messages', {
+          p_thread_id: currentThreadId,
+          p_guest_session_id: guestSessionId
+        });
+
+        if (msgsError) throw msgsError;
+        
+        // Transform RPC output to match message format
+        const transformedMsgs = msgs?.map((m: any) => ({
+          ...m,
+          sender: {
+            username: m.sender_username,
+            avatar_url: m.sender_avatar_url
+          }
+        }));
+
+        setMessages(transformedMsgs || []);
+      }
+      
       setStep('chat');
     } catch (error) {
       console.error('Error starting chat:', error);
@@ -203,18 +244,6 @@ export function LiveChatWidget() {
     }
   };
 
-  const [guestSessionId, setGuestSessionId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!user) {
-      let gid = localStorage.getItem('rs_guest_session_id');
-      if (!gid) {
-        gid = crypto.randomUUID();
-        localStorage.setItem('rs_guest_session_id', gid);
-      }
-      setGuestSessionId(gid);
-    }
-  }, [user]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -297,6 +326,33 @@ export function LiveChatWidget() {
             {/* Content */}
             <div className="flex-1 overflow-hidden flex flex-col">
               <AnimatePresence mode="wait">
+                {step === 'welcome' && (
+                  <motion.div
+                    key="welcome"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    className="p-8 text-center space-y-6"
+                  >
+                    <div className="w-20 h-20 bg-amber-500/10 rounded-[2rem] flex items-center justify-center mx-auto border border-amber-500/20 group-hover:scale-110 transition-transform duration-500">
+                      <Headphones className="w-10 h-10 text-amber-500" />
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="text-xl font-black text-white uppercase tracking-tighter">RSPlatform Support</h3>
+                      <p className="text-zinc-500 text-[11px] font-medium leading-relaxed max-w-[200px] mx-auto">
+                        Welcome! I'm your virtual assistant. How can we help you today?
+                      </p>
+                    </div>
+                    <Button 
+                      variant="gold" 
+                      className="w-full h-14 rounded-2xl text-[11px] font-black uppercase tracking-[0.3em] shadow-lg shadow-amber-500/10"
+                      onClick={() => setStep('initial')}
+                    >
+                      Get Started
+                    </Button>
+                  </motion.div>
+                )}
+
                 {step === 'initial' && (
                   <motion.div
                     key="initial"

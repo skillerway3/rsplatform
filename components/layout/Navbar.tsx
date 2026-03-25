@@ -196,10 +196,10 @@ export function Navbar() {
                             </div>
                             <div className="min-w-0">
                               <p className="text-[11px] font-black text-white uppercase tracking-widest truncate leading-none mb-1">
-                                {profile?.username || user.email?.split('@')[0]}
+                                {profile?.username || 'Member'}
                               </p>
                               <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-[0.2em] truncate">
-                                {user.email}
+                                {profile?.role === 'admin' ? 'Administrator' : 'Member'}
                               </p>
                             </div>
                           </div>
