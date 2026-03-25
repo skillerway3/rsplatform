@@ -10,7 +10,6 @@ import {
   ArrowRight, 
   Github, 
   Chrome, 
-  Facebook,
   ChevronLeft,
   Zap,
   CheckCircle2,
@@ -33,7 +32,7 @@ export default function SignupPage() {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  const handleSocialLogin = async (provider: 'google' | 'facebook') => {
+  const handleSocialLogin = async (provider: 'google') => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
@@ -202,22 +201,14 @@ export default function SignupPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <Button 
-                variant="ghost" 
-                onClick={() => handleSocialLogin('facebook')}
-                className="h-12 rounded-xl border border-zinc-800 text-[9px] font-black uppercase tracking-widest text-zinc-500 hover:text-zinc-100"
-              >
-                <Facebook className="w-4 h-4 mr-2" />
-                Facebook
-              </Button>
+            <div className="space-y-4">
               <Button 
                 variant="ghost" 
                 onClick={() => handleSocialLogin('google')}
-                className="h-12 rounded-xl border border-zinc-800 text-[9px] font-black uppercase tracking-widest text-zinc-500 hover:text-zinc-100"
+                className="w-full h-12 rounded-xl border border-zinc-800 text-[9px] font-black uppercase tracking-widest text-zinc-500 hover:text-zinc-100"
               >
                 <Chrome className="w-4 h-4 mr-2" />
-                Google
+                Continue with Google
               </Button>
             </div>
           </Card>

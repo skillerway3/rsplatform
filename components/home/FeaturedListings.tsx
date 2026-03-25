@@ -5,19 +5,19 @@ export function FeaturedListings() {
     {
       id: 'osrs',
       name: 'OSRS',
-      image: 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=2070&auto=format&fit=crop',
+      image: '/osrs-hero.jpg',
       href: '/browse?section=boosting&game=osrs'
     },
     {
       id: 'rs3',
       name: 'RS3',
-      image: 'https://images.unsplash.com/photo-1534423861386-85a16f5d13fd?q=80&w=2070&auto=format&fit=crop',
+      image: '/rs3-hero.jpg',
       href: '/browse?section=boosting&game=rs3'
     },
     {
       id: 'rsps',
       name: 'RSPS',
-      image: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=2069&auto=format&fit=crop',
+      image: '/rsps-hero.jpg',
       href: '/browse?section=boosting&game=rsps'
     }
   ];
@@ -38,9 +38,9 @@ export function FeaturedListings() {
               <img 
                 src={game.image} 
                 alt={game.name}
-                className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110 opacity-40 group-hover:opacity-100"
+                className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110 opacity-60 group-hover:opacity-100"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent opacity-80 group-hover:opacity-40 transition-opacity duration-700" />
+              <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent opacity-70 group-hover:opacity-30 transition-opacity duration-700" />
               
               <div className="absolute inset-0 flex flex-col items-center justify-center p-8">
                 <div className="w-12 h-[1px] bg-amber-500/50 mb-4 group-hover:w-20 transition-all duration-700" />
