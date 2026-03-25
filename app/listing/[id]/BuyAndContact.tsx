@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/app/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import ContactSellerButton from "@/app/components/ContactSellerButton";
 
 export default function BuyAndContact({

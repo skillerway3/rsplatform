@@ -83,6 +83,7 @@ export default function ListingDetailPage() {
               username,
               avatar_url,
               is_verified_seller,
+              is_trusted_seller,
               average_rating,
               review_count
             )
@@ -103,6 +104,7 @@ export default function ListingDetailPage() {
             username: data.seller?.username || 'Unknown',
             avatar: data.seller?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.seller_id}`,
             isVerified: data.seller?.is_verified_seller || false,
+            isTrusted: data.seller?.is_trusted_seller || false,
             rating: data.seller?.average_rating || 0,
             totalSales: data.seller?.review_count || 0,
           }

@@ -9,8 +9,32 @@ import { NotificationProvider } from '@/components/providers/NotificationProvide
 import { LiveChatWidget } from '@/components/support/LiveChatWidget';
 
 export const metadata: Metadata = {
-  title: 'RSPlatform | Premium OSRS Marketplace',
+  metadataBase: new URL(process.env.APP_URL || 'https://rsplatform.gg'),
+  title: {
+    default: 'RSPlatform | Premium OSRS Marketplace',
+    template: '%s | RSPlatform'
+  },
   description: 'The premium marketplace for Old School RuneScape assets, currency, and professional boosting services.',
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    url: 'https://rsplatform.gg',
+    siteName: 'RSPlatform',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'RSPlatform Marketplace'
+      }
+    ]
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'RSPlatform | Premium OSRS Marketplace',
+    description: 'The premium marketplace for Old School RuneScape assets, currency, and professional boosting services.',
+    images: ['/og-image.png']
+  }
 };
 
 export default function RootLayout({

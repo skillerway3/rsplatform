@@ -14,7 +14,16 @@ import {
   Camera,
   CheckCircle2,
   AlertCircle,
-  Zap
+  Zap,
+  LayoutDashboard,
+  ShoppingBag,
+  Tag,
+  MessageSquare,
+  Wallet,
+  HelpCircle,
+  History,
+  FileText,
+  DollarSign
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -108,6 +117,20 @@ export default function ProfilePage() {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
+    // Validation
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+
+    if (!allowedTypes.includes(file.type)) {
+      setError('Invalid file type. Please upload a JPEG, PNG, or WebP image.');
+      return;
+    }
+
+    if (file.size > maxSize) {
+      setError('File is too large. Maximum size is 5MB.');
+      return;
+    }
+
     setUploading(true);
     setError(null);
 
@@ -135,6 +158,10 @@ export default function ProfilePage() {
 
       setProfile(prev => prev ? ({ ...prev, avatar_url: publicUrl }) : null);
       setSuccess(true);
+      
+      // Force refresh of any components listening to auth state if they use profile data
+      // In this app, Navbar uses useAuth which might need a refresh or we just rely on state propagation
+      router.refresh();
     } catch (err: any) {
       console.error('Error uploading avatar:', err);
       setError('Failed to upload avatar');
@@ -273,8 +300,35 @@ export default function ProfilePage() {
               </Card>
             </div>
 
-            {/* Right Column: Edit Profile */}
-            <div className="lg:col-span-2">
+            {/* Right Column: Edit Profile & Hub */}
+            <div className="lg:col-span-2 space-y-8">
+              {/* Navigation Hub */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                {[
+                  { label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard', color: 'text-blue-500' },
+                  { label: 'Marketplace', icon: ShoppingBag, href: '/marketplace', color: 'text-amber-500' },
+                  { label: 'Sell Now', icon: Tag, href: '/sell', color: 'text-emerald-500' },
+                  { label: 'My Orders', icon: ShoppingBag, href: '/dashboard/orders', color: 'text-amber-500' },
+                  { label: 'My Sales', icon: DollarSign, href: '/dashboard/sales', color: 'text-emerald-400' },
+                  { label: 'My Wallet', icon: Wallet, href: '/profile/balance', color: 'text-purple-500' },
+                  { label: 'Messages', icon: MessageSquare, href: '/messages', color: 'text-pink-500' },
+                  { label: 'Support', icon: HelpCircle, href: '/support', color: 'text-cyan-500' },
+                  { label: 'Contact Us', icon: Mail, href: '/support/contact', color: 'text-zinc-400' },
+                  { label: 'Report Issue', icon: ShieldAlert, href: '/support/report', color: 'text-red-500' },
+                  { label: 'Verification', icon: ShieldCheck, href: '/sell/verify', color: 'text-emerald-400' },
+                  { label: 'My Requests', icon: FileText, href: '/dashboard/requests', color: 'text-blue-400' },
+                ].map((item) => (
+                  <Link key={item.label} href={item.href}>
+                    <Card className="premium-card p-6 flex flex-col items-center text-center gap-3 hover:bg-white/5 transition-all group cursor-pointer border-white/5">
+                      <div className={cn("w-10 h-10 rounded-xl bg-zinc-950 flex items-center justify-center border border-white/5 group-hover:scale-110 transition-transform", item.color)}>
+                        <item.icon className="w-5 h-5" />
+                      </div>
+                      <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400 group-hover:text-white transition-colors">{item.label}</span>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+
               <Card className="premium-card p-10">
                 <form onSubmit={handleUpdateProfile} className="space-y-10">
                   <div className="flex items-center gap-4 mb-4">

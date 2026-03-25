@@ -8,7 +8,8 @@ import {
   Plus, 
   Image as ImageIcon, 
   Smile, 
-  Send 
+  Send,
+  BadgeCheck
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -57,7 +58,15 @@ export function ChatWindow({
             <div>
               <div className="flex items-center space-x-2">
                 <h3 className="text-sm font-black text-zinc-100 uppercase tracking-widest">{activeUser.username}</h3>
-                <Badge variant="gold" className="text-[8px] font-black uppercase tracking-widest h-4">Verified</Badge>
+                {activeUser.isVerified && (
+                  <Badge variant="gold" className="text-[8px] font-black uppercase tracking-widest h-4">Verified</Badge>
+                )}
+                {activeUser.isTrusted && (
+                  <div className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded-md">
+                    <BadgeCheck className="w-2.5 h-2.5 text-amber-500" />
+                    <span className="text-[7px] font-black text-amber-500 uppercase tracking-widest">Trusted</span>
+                  </div>
+                )}
               </div>
               <div className="flex items-center text-[9px] font-black text-emerald-500 uppercase tracking-widest mt-1">
                 <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-2 animate-pulse" />

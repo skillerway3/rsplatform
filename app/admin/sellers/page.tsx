@@ -61,7 +61,13 @@ export default function AdminSellersPage() {
       return;
     }
 
-    if (user.email === 'skillerway100@gmail.com') {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (profile?.role === 'admin') {
       setIsAdmin(true);
       fetchProfiles();
     } else {

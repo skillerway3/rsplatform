@@ -1,12 +1,42 @@
 'use client';
 
-import React from 'react';
-import { MessageSquare, X, ChevronRight, ShieldCheck, Headphones, AlertCircle, HelpCircle, ArrowLeft, Send, Loader2, User } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  MessageSquare, 
+  X, 
+  Send, 
+  User, 
+  Headphones, 
+  ChevronRight, 
+  HelpCircle,
+  ShieldCheck,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  ArrowLeft
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/Button';
+import { createClient } from '@/lib/supabase';
+import { cn } from '@/lib/utils';
+import Image from 'next/image';
 import { useAuth } from '@/components/auth/AuthProvider';
 
-type ChatStep = 'initial' | 'buyer' | 'seller' | 'faq' | 'live_agent' | 'success';
+interface Message {
+  id: string;
+  sender_id: string;
+  content: string;
+  sender_type: 'user' | 'admin' | 'system';
+  is_read: boolean;
+  created_at: string;
+  sender?: {
+    username: string;
+    avatar_url: string;
+  };
+}
+
+type ChatStep = 'initial' | 'buyer' | 'seller' | 'faq' | 'chat' | 'success' | 'guest_form';
 
 interface FAQItem {
   question: string;
@@ -51,39 +81,184 @@ const SELLER_FAQS: Record<string, FAQItem[]> = {
 
 export function LiveChatWidget() {
   const { user } = useAuth();
-  const [isOpen, setIsOpen] = React.useState(false);
-  const [step, setStep] = React.useState<ChatStep>('initial');
-  const [parentStep, setParentStep] = React.useState<'buyer' | 'seller' | null>(null);
-  const [category, setCategory] = React.useState<string | null>(null);
-  const [selectedFaq, setSelectedFaq] = React.useState<FAQItem | null>(null);
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [chatMessage, setChatMessage] = React.useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const [step, setStep] = useState<ChatStep>('initial');
+  const [parentStep, setParentStep] = useState<'buyer' | 'seller' | null>(null);
+  const [category, setCategory] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputText, setInputText] = useState('');
+  const [threadId, setThreadId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const supabase = createClient();
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages, step]);
+
+  // Subscribe to messages if thread exists
+  useEffect(() => {
+    if (!threadId || step !== 'chat') return;
+
+    const channel = supabase
+      .channel(`support_thread_${threadId}`)
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'support_messages',
+        filter: `thread_id=eq.${threadId}`
+      }, async (payload) => {
+        const { data: newMessage } = await supabase
+          .from('support_messages')
+          .select(`*, sender:profiles!support_messages_sender_id_fkey(username, avatar_url)`)
+          .eq('id', payload.new.id)
+          .single();
+        
+        if (newMessage) {
+          setMessages(prev => {
+            if (prev.find(m => m.id === newMessage.id)) return prev;
+            return [...prev, newMessage];
+          });
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [threadId, step]);
 
   const resetChat = () => {
     setStep('initial');
     setCategory(null);
-    setSelectedFaq(null);
-    setChatMessage('');
+    setInputText('');
   };
 
+  const [guestInfo, setGuestInfo] = useState({ name: '', email: '' });
+
   const handleLiveAgentRequest = async (topic?: string) => {
-    setIsSubmitting(true);
+    if (!user && (!guestInfo.name || !guestInfo.email)) {
+      setStep('guest_form');
+      return;
+    }
+
+    setLoading(true);
     try {
-      await fetch('/api/notify-admin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'live_agent_request',
-          email: user?.email || 'Guest',
-          category: parentStep === 'buyer' ? 'Buyer' : 'Seller',
-          topic: topic || chatMessage || 'General Support',
-        }),
-      });
-      setStep('success');
+      // Check for existing open thread
+      let query = supabase
+        .from('support_threads')
+        .select('id')
+        .eq('status', 'open');
+      
+      if (user) {
+        query = query.eq('user_id', user.id);
+      } else {
+        query = query.eq('guest_email', guestInfo.email);
+      }
+
+      const { data: existingThread } = await query
+        .order('last_message_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      let currentThreadId = existingThread?.id;
+
+      if (!currentThreadId) {
+        const { data: newThread, error: threadError } = await supabase
+          .from('support_threads')
+          .insert({
+            user_id: user?.id || null,
+            guest_name: user ? null : guestInfo.name,
+            guest_email: user ? null : guestInfo.email,
+            guest_session_id: user ? null : guestSessionId,
+            subject: topic || 'Live Agent Support Request',
+            priority: 'medium',
+            status: 'open'
+          })
+          .select()
+          .single();
+
+        if (threadError) throw threadError;
+        currentThreadId = newThread.id;
+      }
+
+      setThreadId(currentThreadId);
+      
+      // Fetch messages
+      const { data: msgs } = await supabase
+        .from('support_messages')
+        .select(`*, sender:profiles!support_messages_sender_id_fkey(username, avatar_url)`)
+        .eq('thread_id', currentThreadId)
+        .order('created_at', { ascending: true });
+
+      setMessages(msgs || []);
+      setStep('chat');
     } catch (error) {
-      console.error('Failed to notify admin:', error);
+      console.error('Error starting chat:', error);
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
+    }
+  };
+
+  const [guestSessionId, setGuestSessionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) {
+      let gid = localStorage.getItem('rs_guest_session_id');
+      if (!gid) {
+        gid = crypto.randomUUID();
+        localStorage.setItem('rs_guest_session_id', gid);
+      }
+      setGuestSessionId(gid);
+    }
+  }, [user]);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputText.trim() || !threadId || isSending) return;
+
+    setIsSending(true);
+    const content = inputText;
+    setInputText('');
+
+    try {
+      if (user) {
+        const { error } = await supabase.from('support_messages').insert({
+          thread_id: threadId,
+          sender_id: user.id,
+          content,
+          sender_type: 'user',
+          is_read: false
+        });
+
+        if (error) throw error;
+
+        await supabase.from('support_threads').update({ 
+          last_message_at: new Date().toISOString() 
+        }).eq('id', threadId);
+      } else {
+        // Guest message via API
+        const response = await fetch('/api/support/guest-message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            threadId,
+            guestSessionId,
+            content
+          })
+        });
+
+        if (!response.ok) throw new Error('Failed to send guest message');
+      }
+
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setInputText(content);
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -120,7 +295,7 @@ export function LiveChatWidget() {
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+            <div className="flex-1 overflow-hidden flex flex-col">
               <AnimatePresence mode="wait">
                 {step === 'initial' && (
                   <motion.div
@@ -128,7 +303,7 @@ export function LiveChatWidget() {
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -20 }}
-                    className="space-y-4"
+                    className="p-6 space-y-4"
                   >
                     <p className="text-zinc-400 text-xs font-medium leading-relaxed mb-6">
                       Hello! Pick an option below so we can assist you.
@@ -172,7 +347,7 @@ export function LiveChatWidget() {
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -20 }}
-                    className="space-y-3"
+                    className="p-6 space-y-3"
                   >
                     <button 
                       onClick={resetChat}
@@ -199,15 +374,13 @@ export function LiveChatWidget() {
                       { id: 'feedback', label: 'I want to report abusive feedback', icon: HelpCircle },
                       { id: 'violations', label: 'I want to report a violation', icon: AlertCircle },
                       { id: 'delete_account', label: 'I want to delete my account', icon: User },
-                      { id: 'close', label: 'Close conversation', icon: X },
+                      { id: 'live_agent', label: 'Talk to Live Agent', icon: Headphones, primary: true },
                     ]).map((opt) => (
                       <button 
                         key={opt.id}
                         onClick={() => {
-                          if (opt.id === 'close') {
-                            setIsOpen(false);
-                          } else if (opt.id === 'live_agent') {
-                            setStep('live_agent');
+                          if (opt.id === 'live_agent') {
+                            handleLiveAgentRequest();
                           } else {
                             setCategory(opt.id);
                             setStep('faq');
@@ -241,57 +414,13 @@ export function LiveChatWidget() {
                   </motion.div>
                 )}
 
-                {step === 'live_agent' && (
-                  <motion.div
-                    key="live_agent"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="space-y-6"
-                  >
-                    <button 
-                      onClick={() => setStep(parentStep || 'initial')}
-                      className="flex items-center space-x-2 text-[9px] font-black text-zinc-500 uppercase tracking-widest hover:text-white transition-colors mb-4"
-                    >
-                      <ArrowLeft className="w-3 h-3" />
-                      <span>Back</span>
-                    </button>
-
-                    <div className="space-y-4">
-                      <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center border border-amber-500/20">
-                        <Headphones className="w-6 h-6 text-amber-500" />
-                      </div>
-                      <h3 className="text-sm font-black text-white uppercase tracking-widest">Connect with Agent</h3>
-                      <p className="text-zinc-500 text-[10px] font-medium leading-relaxed">
-                        Please describe your issue briefly so we can connect you with the right specialist.
-                      </p>
-                      
-                      <textarea
-                        value={chatMessage}
-                        onChange={(e) => setChatMessage(e.target.value)}
-                        placeholder="Type your message here..."
-                        className="w-full h-32 bg-zinc-900/50 border border-white/5 rounded-2xl p-4 text-xs font-medium text-white focus:outline-none focus:border-amber-500/30 transition-all resize-none"
-                      />
-
-                      <Button 
-                        variant="gold" 
-                        className="w-full h-12 rounded-xl text-[10px] font-black uppercase tracking-widest"
-                        onClick={() => handleLiveAgentRequest()}
-                        disabled={isSubmitting || !chatMessage.trim()}
-                      >
-                        {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send Request'}
-                      </Button>
-                    </div>
-                  </motion.div>
-                )}
-
                 {step === 'faq' && category && (
                   <motion.div
                     key="faq"
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -20 }}
-                    className="space-y-4"
+                    className="p-6 space-y-4"
                   >
                     <button 
                       onClick={() => setStep(parentStep || 'initial')}
@@ -308,18 +437,6 @@ export function LiveChatWidget() {
                         <div key={i} className="bg-zinc-900/30 border border-white/5 rounded-2xl p-4">
                           <h4 className="text-[10px] font-black text-white uppercase tracking-widest mb-2">{faq.question}</h4>
                           <p className="text-zinc-500 text-[10px] font-medium leading-relaxed">{faq.answer}</p>
-                          {category === 'wallet' && parentStep === 'buyer' && (
-                            <Button 
-                              variant="gold" 
-                              className="w-full mt-4 rounded-xl text-[9px] font-black uppercase tracking-widest"
-                              onClick={() => {
-                                setChatMessage("I would like to proceed with a withdrawal request.");
-                                handleLiveAgentRequest("Withdrawal Request");
-                              }}
-                            >
-                              Proceed
-                            </Button>
-                          )}
                         </div>
                       ))}
                     </div>
@@ -330,31 +447,139 @@ export function LiveChatWidget() {
                         variant="outline" 
                         className="w-full rounded-xl text-[9px] font-black uppercase tracking-widest border-white/5 hover:bg-white/5"
                         onClick={() => handleLiveAgentRequest(`FAQ: ${category}`)}
-                        disabled={isSubmitting}
+                        disabled={loading}
                       >
-                        {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Talk to Live Agent'}
+                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Talk to Live Agent'}
                       </Button>
                     </div>
                   </motion.div>
                 )}
 
-                {step === 'success' && (
+                {step === 'guest_form' && (
                   <motion.div
-                    key="success"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="text-center py-12"
+                    key="guest_form"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="p-6 space-y-6"
                   >
-                    <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-500/20">
-                      <Send className="w-8 h-8 text-emerald-500" />
+                    <button 
+                      onClick={() => setStep(parentStep || 'initial')}
+                      className="flex items-center space-x-2 text-[9px] font-black text-zinc-500 uppercase tracking-widest hover:text-white transition-colors mb-4"
+                    >
+                      <ArrowLeft className="w-3 h-3" />
+                      <span>Back</span>
+                    </button>
+
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-black text-white uppercase tracking-widest">Guest Support</h3>
+                      <p className="text-zinc-500 text-[10px] font-medium leading-relaxed">
+                        Please provide your details so we can assist you better.
+                      </p>
                     </div>
-                    <h3 className="text-xl font-black text-white uppercase tracking-tight mb-4">Request Sent</h3>
-                    <p className="text-zinc-500 text-[10px] font-medium leading-relaxed mb-8">
-                      A support agent has been notified. We will contact you via email or platform message within 15 minutes.
-                    </p>
-                    <Button variant="outline" onClick={resetChat} className="rounded-xl px-8 text-[9px] font-black uppercase tracking-widest">
-                      Start New Inquiry
+
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest ml-1">Full Name</label>
+                        <input 
+                          type="text"
+                          placeholder="Your Name"
+                          value={guestInfo.name}
+                          onChange={(e) => setGuestInfo({ ...guestInfo, name: e.target.value })}
+                          className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-xs font-medium text-white focus:outline-none focus:border-amber-500/30 transition-all"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest ml-1">Email Address</label>
+                        <input 
+                          type="email"
+                          placeholder="your@email.com"
+                          value={guestInfo.email}
+                          onChange={(e) => setGuestInfo({ ...guestInfo, email: e.target.value })}
+                          className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-xs font-medium text-white focus:outline-none focus:border-amber-500/30 transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    <Button 
+                      variant="gold" 
+                      className="w-full h-12 rounded-xl text-[10px] font-black uppercase tracking-widest"
+                      onClick={() => handleLiveAgentRequest()}
+                      disabled={!guestInfo.name || !guestInfo.email || loading}
+                    >
+                      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Start Chat'}
                     </Button>
+                  </motion.div>
+                )}
+
+                {step === 'chat' && (
+                  <motion.div
+                    key="chat"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="flex-1 flex flex-col min-h-0"
+                  >
+                    <div className="p-4 border-b border-white/5 flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <button onClick={() => setStep(parentStep || 'initial')} className="p-2 text-zinc-500 hover:text-white">
+                          <ChevronRight className="w-4 h-4 rotate-180" />
+                        </button>
+                        <span className="text-[10px] font-black text-white uppercase tracking-widest">Live Support Chat</span>
+                      </div>
+                      <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">ID: {threadId?.substr(0, 8)}</span>
+                    </div>
+                    
+                    <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4 scroll-smooth custom-scrollbar">
+                      {messages.length === 0 && (
+                        <div className="text-center py-12 space-y-4">
+                          <div className="w-12 h-12 bg-zinc-950 rounded-2xl flex items-center justify-center border border-white/5 mx-auto">
+                            <MessageSquare className="w-6 h-6 text-zinc-700" />
+                          </div>
+                          <p className="text-[11px] text-zinc-500 font-medium max-w-[200px] mx-auto">
+                            Send a message to start your conversation with an agent.
+                          </p>
+                        </div>
+                      )}
+                      {messages.map((msg) => (
+                        <div 
+                          key={msg.id} 
+                          className={cn(
+                            "flex flex-col space-y-1 max-w-[85%]",
+                            msg.sender_type === 'admin' ? "items-start" : "items-end ml-auto"
+                          )}
+                        >
+                          <div className={cn(
+                            "px-4 py-3 rounded-2xl text-[11px] font-medium leading-relaxed shadow-sm",
+                            msg.sender_type === 'admin' 
+                              ? "bg-zinc-950 text-zinc-300 border border-white/5 rounded-tl-none" 
+                              : "bg-amber-500 text-zinc-950 rounded-tr-none"
+                          )}>
+                            {msg.content}
+                          </div>
+                          <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest px-1">
+                            {msg.sender_type === 'admin' ? 'Support Agent' : (msg.sender?.username || (user ? 'You' : 'Guest'))} • {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <form onSubmit={handleSendMessage} className="p-4 bg-zinc-950/50 border-t border-white/5 flex items-center space-x-3">
+                      <input 
+                        type="text"
+                        placeholder="Type your message..."
+                        value={inputText}
+                        onChange={(e) => setInputText(e.target.value)}
+                        className="flex-1 bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-xs font-medium text-white focus:outline-none focus:border-amber-500/30 transition-all"
+                      />
+                      <button 
+                        type="submit"
+                        disabled={isSending || !inputText.trim()}
+                        className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center text-zinc-950 disabled:opacity-50 transition-all hover:scale-105 active:scale-95"
+                      >
+                        {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                      </button>
+                    </form>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -391,8 +616,4 @@ export function LiveChatWidget() {
       </button>
     </div>
   );
-}
-
-function cn(...classes: any[]) {
-  return classes.filter(Boolean).join(' ');
 }

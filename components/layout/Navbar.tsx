@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { ShieldCheck, MessageSquare, User, Menu, X, PlusCircle, ChevronDown, LogOut, LayoutDashboard, Zap } from 'lucide-react';
+import { ShieldCheck, MessageSquare, User, Menu, X, PlusCircle, ChevronDown, LogOut, LayoutDashboard, Zap, BadgeCheck, DollarSign, ShoppingBag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { motion, AnimatePresence } from 'motion/react';
@@ -13,7 +13,7 @@ import { useNotifications } from '@/components/providers/NotificationProvider';
 import { NotificationDropdown } from '@/components/layout/NotificationDropdown';
 
 export function Navbar() {
-  const { user, signOut, isVerifiedSeller } = useAuth();
+  const { user, profile, signOut, isVerifiedSeller } = useAuth();
   const { unreadCount } = useNotifications();
   const pathname = usePathname();
   const router = useRouter();
@@ -157,11 +157,19 @@ export function Navbar() {
               <button 
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
                 className={cn(
-                  "p-2 transition-colors rounded-xl",
-                  isProfileOpen ? "text-amber-500 bg-amber-500/10" : "text-zinc-100 hover:text-amber-500"
+                  "p-1 transition-colors rounded-xl border border-transparent",
+                  isProfileOpen ? "text-amber-500 bg-amber-500/10 border-amber-500/20" : "text-zinc-100 hover:text-amber-500"
                 )}
               >
-                <User className="w-5 h-5" />
+                {profile?.avatar_url ? (
+                  <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10">
+                    <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                  </div>
+                ) : (
+                  <div className="w-8 h-8 rounded-lg bg-zinc-900 flex items-center justify-center border border-white/10">
+                    <User className="w-4 h-4" />
+                  </div>
+                )}
               </button>
 
               <AnimatePresence>
@@ -175,14 +183,38 @@ export function Navbar() {
                   >
                     {user ? (
                       <>
-                        <div className="px-5 py-3 border-b border-white/5 mb-2">
-                          <p className="text-[10px] font-black text-white uppercase tracking-widest truncate">{user.email}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-[0.2em]">Member</p>
+                        <div className="px-5 py-4 border-b border-white/5 mb-2 bg-white/5">
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="w-10 h-10 rounded-xl overflow-hidden border border-white/10 bg-zinc-900 shrink-0">
+                              {profile?.avatar_url ? (
+                                <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <User className="w-5 h-5 text-zinc-600" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-[11px] font-black text-white uppercase tracking-widest truncate leading-none mb-1">
+                                {profile?.username || user.email?.split('@')[0]}
+                              </p>
+                              <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-[0.2em] truncate">
+                                {user.email}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="flex flex-wrap gap-1.5">
                             {isVerifiedSeller && (
                               <div className="flex items-center gap-1 px-1.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md">
                                 <ShieldCheck className="w-2.5 h-2.5 text-emerald-500" />
                                 <span className="text-[7px] font-black text-emerald-500 uppercase tracking-widest">Verified</span>
+                              </div>
+                            )}
+                            {profile?.is_trusted_seller && (
+                              <div className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded-md">
+                                <BadgeCheck className="w-2.5 h-2.5 text-amber-500" />
+                                <span className="text-[7px] font-black text-amber-500 uppercase tracking-widest">Trusted</span>
                               </div>
                             )}
                           </div>
@@ -204,18 +236,38 @@ export function Navbar() {
                           Dashboard
                         </Link>
                         <Link
-                          href="/orders"
+                          href="/dashboard/orders"
                           className="flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
                           onClick={() => setIsProfileOpen(false)}
                         >
-                          <ShieldCheck className="w-4 h-4" />
+                          <ShoppingBag className="w-4 h-4" />
                           My Orders
                         </Link>
-                        <div className="flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-600 cursor-not-allowed select-none">
+                        <Link
+                          href="/dashboard/my-listings"
+                          className="flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
+                          onClick={() => setIsProfileOpen(false)}
+                        >
+                          <PlusCircle className="w-4 h-4" />
+                          My Listings
+                        </Link>
+                        <Link
+                          href="/dashboard/sales"
+                          className="flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
+                          onClick={() => setIsProfileOpen(false)}
+                        >
+                          <DollarSign className="w-4 h-4" />
+                          My Sales
+                        </Link>
+                        <Link
+                          href="/dashboard/offers"
+                          className="flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
+                          onClick={() => setIsProfileOpen(false)}
+                        >
                           <Zap className="w-4 h-4" />
-                          Loyalty (Coming Soon)
-                        </div>
-                        {user.email === 'skillerway100@gmail.com' && (
+                          My Offers
+                        </Link>
+                        {profile?.role === 'admin' && (
                           <>
                             <Link
                               href="/admin/verifications"
@@ -380,18 +432,18 @@ export function Navbar() {
               <div className="pt-8 flex flex-col space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <Link 
-                    href="/dashboard/requests" 
+                    href="/dashboard/orders" 
                     className="flex items-center justify-center py-4 bg-zinc-900 rounded-xl text-zinc-400 font-black uppercase tracking-widest text-[10px] border border-white/5"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    My Requests
+                    My Orders
                   </Link>
                   <Link 
                     href="/dashboard/sales" 
                     className="flex items-center justify-center py-4 bg-zinc-900 rounded-xl text-zinc-400 font-black uppercase tracking-widest text-[10px] border border-white/5"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    Sales
+                    My Sales
                   </Link>
                   <Link 
                     href="/messages" 

@@ -267,7 +267,7 @@ CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.
 -- Admin policy for profiles
 DROP POLICY IF EXISTS "Admins can update any profile" ON profiles;
 CREATE POLICY "Admins can update any profile" ON profiles FOR UPDATE USING (
-  auth.jwt() ->> 'email' = 'skillerway100@gmail.com'
+  is_admin(auth.uid())
 );
 
 -- Trigger to prevent non-admins from updating sensitive profile fields
@@ -276,7 +276,7 @@ RETURNS TRIGGER AS $$
 BEGIN
   -- If not admin, reset sensitive fields to OLD values
   IF NOT (
-    auth.jwt() ->> 'email' = 'skillerway100@gmail.com'
+    is_admin(auth.uid())
   ) THEN
     NEW.is_verified_seller := OLD.is_verified_seller;
     NEW.is_trusted_seller := OLD.is_trusted_seller;
@@ -337,23 +337,23 @@ ALTER TABLE seller_verifications ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view own verification" ON seller_verifications;
 CREATE POLICY "Users can view own verification" ON seller_verifications FOR SELECT USING (
   auth.uid() = user_id OR 
-  auth.jwt() ->> 'email' = 'skillerway100@gmail.com'
+  is_admin(auth.uid())
 );
 DROP POLICY IF EXISTS "Users can insert own verification" ON seller_verifications;
 CREATE POLICY "Users can insert own verification" ON seller_verifications FOR INSERT WITH CHECK (auth.uid() = user_id);
 DROP POLICY IF EXISTS "Admins can update verifications" ON seller_verifications;
 CREATE POLICY "Admins can update verifications" ON seller_verifications FOR UPDATE USING (
-  auth.jwt() ->> 'email' = 'skillerway100@gmail.com'
+  is_admin(auth.uid())
 );
 DROP POLICY IF EXISTS "Admins can manage all verifications" ON seller_verifications;
 CREATE POLICY "Admins can manage all verifications" ON seller_verifications FOR ALL USING (
-  auth.jwt() ->> 'email' = 'skillerway100@gmail.com'
+  is_admin(auth.uid())
 );
 
 -- Admin policy for manual_trusted_override
 DROP POLICY IF EXISTS "Admins can update trusted override" ON profiles;
 CREATE POLICY "Admins can update trusted override" ON profiles FOR UPDATE USING (
-  auth.jwt() ->> 'email' = 'skillerway100@gmail.com'
+  is_admin(auth.uid())
 );
 
 ALTER TABLE buyer_request_proofs ENABLE ROW LEVEL SECURITY;
@@ -454,7 +454,7 @@ CREATE POLICY "Users can view their own verifications" ON storage.objects FOR SE
 DROP POLICY IF EXISTS "Admins can view all verifications" ON storage.objects;
 CREATE POLICY "Admins can view all verifications" ON storage.objects FOR SELECT USING (
   bucket_id = 'verifications' AND (
-    auth.jwt() ->> 'email' = 'skillerway100@gmail.com'
+    is_admin(auth.uid())
   )
 );
 
@@ -462,7 +462,7 @@ CREATE POLICY "Admins can view all verifications" ON storage.objects FOR SELECT 
 DROP POLICY IF EXISTS "Admins can manage all verifications" ON storage.objects;
 CREATE POLICY "Admins can manage all verifications" ON storage.objects FOR ALL USING (
   bucket_id = 'verifications' AND (
-    auth.jwt() ->> 'email' = 'skillerway100@gmail.com'
+    is_admin(auth.uid())
   )
 );
 
