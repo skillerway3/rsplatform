@@ -5,26 +5,25 @@ export function FeaturedListings() {
     {
       id: 'osrs',
       name: 'OSRS',
-      image: '/osrs-hero.jpg',
+      image: '/osrs-hero-v2.jpg',
       href: '/browse?section=boosting&game=osrs'
     },
     {
       id: 'rs3',
       name: 'RS3',
-      image: '/rs3-hero.jpg',
+      image: '/rs3-hero-v2.jpg',
       href: '/browse?section=boosting&game=rs3'
     },
     {
       id: 'rsps',
       name: 'RSPS',
-      image: '/rsps-hero.jpg',
+      image: '/rsps-hero-v2.jpg',
       href: '/browse?section=boosting&game=rsps'
     }
   ];
 
   return (
     <section className="py-24 bg-zinc-950 relative overflow-hidden">
-      {/* Subtle background glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-amber-500/5 blur-[120px] pointer-events-none" />
       
       <div className="container mx-auto px-6 relative z-10">
@@ -52,7 +51,6 @@ export function FeaturedListings() {
                 </div>
               </div>
 
-              {/* Corner accent */}
               <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
             </Link>
           ))}
