@@ -260,7 +260,7 @@ export default function AdminDashboardPage() {
         {[
           { label: 'Moderate Listings', href: '/admin/listings', icon: List },
           { label: 'Review Verifications', href: '/admin/verifications', icon: UserCheck },
-          { label: 'Support Threads', href: '/admin/support', icon: MessageSquare },
+          { label: 'Support Threads', href: '/admin/support/threads', icon: MessageSquare },
           { label: 'User Reports', href: '/admin/reports', icon: Flag },
           { label: 'Platform Issues', href: '/admin/support', icon: AlertTriangle },
           { label: 'Dispute Center', href: '/admin/disputes', icon: AlertCircle },

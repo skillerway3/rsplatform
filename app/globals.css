@@ -40,11 +40,11 @@
 
 @layer components {
   .glass {
-    @apply bg-[#161618]/50 backdrop-blur-xl border border-white/5;
+    @apply bg-[#161618]/50 border border-white/5;
   }
   
   .premium-card {
-    @apply bg-[#161618]/40 backdrop-blur-2xl border border-zinc-800/40 rounded-[2.5rem] shadow-2xl transition-all duration-500;
+    @apply bg-[#161618]/40 border border-zinc-800/40 rounded-[2.5rem] shadow-2xl transition-all duration-500;
   }
   
   .premium-card:hover {

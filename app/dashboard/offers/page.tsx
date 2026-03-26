@@ -38,8 +38,22 @@ interface Offer {
     buyer: {
       username: string;
       avatar_url: string;
-    };
-  };
+    } | {
+      username: string;
+      avatar_url: string;
+    }[];
+  } | {
+    title: string;
+    game: string;
+    category: string;
+    buyer: {
+      username: string;
+      avatar_url: string;
+    } | {
+      username: string;
+      avatar_url: string;
+    }[];
+  }[];
 }
 
 export default function MyOffersPage() {
@@ -53,22 +67,50 @@ export default function MyOffersPage() {
     if (!user) return;
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      // Simplified query: Fetch offers first, then related data manually to avoid nested joins
+      const { data: offersData, error: offersError } = await supabase
         .from('buyer_request_offers')
-        .select(`
-          *,
-          request:buyer_requests!buyer_request_id(
-            title,
-            game,
-            category,
-            buyer:profiles!buyer_id(username, avatar_url)
-          )
-        `)
+        .select('id, buyer_request_id, price, delivery_time, message, status, created_at')
         .eq('seller_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setOffers(data || []);
+      if (offersError) throw offersError;
+      if (!offersData || offersData.length === 0) {
+        setOffers([]);
+        return;
+      }
+
+      // Fetch related requests and buyers in parallel
+      const requestIds = Array.from(new Set(offersData.map(o => o.buyer_request_id).filter(Boolean)));
+      
+      const { data: requestsData, error: requestsError } = await supabase
+        .from('buyer_requests')
+        .select('id, title, game, category, buyer_id')
+        .in('id', requestIds);
+
+      if (requestsError) throw requestsError;
+
+      const buyerIds = Array.from(new Set(requestsData?.map(r => r.buyer_id).filter(Boolean) || []));
+      const { data: buyersData } = await supabase
+        .from('profiles')
+        .select('id, username, avatar_url')
+        .in('id', buyerIds);
+
+      // Map everything back together
+      const enrichedOffers = offersData.map(offer => {
+        const req = requestsData?.find(r => r.id === offer.buyer_request_id);
+        const buyer = buyersData?.find(b => b.id === req?.buyer_id);
+        
+        return {
+          ...offer,
+          request: req ? {
+            ...req,
+            buyer: buyer || { username: 'Unknown', avatar_url: '' }
+          } : null
+        };
+      });
+
+      setOffers(enrichedOffers as any);
     } catch (err: any) {
       console.error('Error fetching offers:', err);
       setError(err.message);
@@ -94,12 +136,29 @@ export default function MyOffersPage() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
+        <div className="text-center space-y-4 max-w-md">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
+          <h1 className="text-2xl font-black text-white uppercase tracking-widest">Offers Error</h1>
+          <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">{error}</p>
+          <button 
+            onClick={() => fetchOffers()}
+            className="px-8 py-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/10 transition-all"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen pt-32 pb-20 bg-zinc-950 relative overflow-hidden">
-      {/* Background Glows */}
+      {/* Background Glows - Simplified for performance */}
       <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-amber-500/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-zinc-100/5 rounded-full blur-[120px]" />
+        <div className="absolute top-[-5%] left-[-5%] w-[20%] h-[20%] bg-amber-500/5 rounded-full blur-[60px]" />
       </div>
 
       <div className="container mx-auto px-6 relative z-10">
@@ -130,19 +189,25 @@ export default function MyOffersPage() {
                       )}>
                         {offer.status}
                       </div>
-                      <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">{offer.request.game} • {offer.request.category}</span>
+                      <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">
+                        {Array.isArray(offer.request) ? offer.request[0]?.game : offer.request?.game} • {Array.isArray(offer.request) ? offer.request[0]?.category : offer.request?.category}
+                      </span>
                     </div>
-                    <h3 className="text-xl font-black text-white uppercase tracking-tight mb-2 group-hover:text-amber-500 transition-colors">{offer.request.title}</h3>
+                    <h3 className="text-xl font-black text-white uppercase tracking-tight mb-2 group-hover:text-amber-500 transition-colors">
+                      {Array.isArray(offer.request) ? offer.request[0]?.title : offer.request?.title}
+                    </h3>
                     <div className="flex items-center gap-3">
                       <div className="relative w-6 h-6 rounded-full overflow-hidden border border-white/10">
                         <Image 
-                          src={offer.request.buyer.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${offer.request.buyer.username}`}
-                          alt={offer.request.buyer.username}
+                          src={(Array.isArray(offer.request) ? (Array.isArray(offer.request[0]?.buyer) ? offer.request[0].buyer[0]?.avatar_url : offer.request[0].buyer?.avatar_url) : (Array.isArray(offer.request?.buyer) ? offer.request.buyer[0]?.avatar_url : offer.request?.buyer?.avatar_url)) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${Array.isArray(offer.request) ? (Array.isArray(offer.request[0]?.buyer) ? offer.request[0].buyer[0]?.username : offer.request[0].buyer?.username) : (Array.isArray(offer.request?.buyer) ? offer.request.buyer[0]?.username : offer.request?.buyer?.username)}`}
+                          alt={Array.isArray(offer.request) ? (Array.isArray(offer.request[0]?.buyer) ? offer.request[0].buyer[0]?.username : offer.request[0].buyer?.username) : (Array.isArray(offer.request?.buyer) ? offer.request.buyer[0]?.username : offer.request?.buyer?.username) || 'User'}
                           fill
                           className="object-cover"
                         />
                       </div>
-                      <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">For {offer.request.buyer.username}</span>
+                      <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                        For {Array.isArray(offer.request) ? (Array.isArray(offer.request[0]?.buyer) ? offer.request[0].buyer[0]?.username : offer.request[0].buyer?.username) : (Array.isArray(offer.request?.buyer) ? offer.request.buyer[0]?.username : offer.request?.buyer?.username)}
+                      </span>
                     </div>
                   </div>
 

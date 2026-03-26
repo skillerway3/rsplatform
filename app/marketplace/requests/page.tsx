@@ -115,7 +115,7 @@ export default function MarketplaceRequestsPage() {
               <Link 
                 key={request.id} 
                 href={`/marketplace/requests/${request.id}`}
-                className="group bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-8 backdrop-blur-xl hover:border-amber-500/30 hover:shadow-[0_20px_40px_rgba(0,0,0,0.3)] transition-all duration-500 relative overflow-hidden"
+                className="group bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-8 hover:border-amber-500/30 hover:shadow-[0_20px_40px_rgba(0,0,0,0.3)] transition-all duration-500 relative overflow-hidden"
               >
                 <div className="absolute top-0 right-0 p-8">
                   <div className="px-3 py-1 bg-amber-500/10 text-amber-500 text-[8px] font-black uppercase tracking-widest rounded-full border border-amber-500/20">

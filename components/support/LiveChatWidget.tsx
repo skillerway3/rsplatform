@@ -127,7 +127,7 @@ export function LiveChatWidget() {
       }, async (payload) => {
         const { data: newMessage } = await supabase
           .from('support_messages')
-          .select(`*, sender:profiles!support_messages_sender_id_fkey(username, avatar_url)`)
+          .select(`*, sender:profiles!sender_id(username, avatar_url)`)
           .eq('id', payload.new.id)
           .single();
         
@@ -210,7 +210,7 @@ export function LiveChatWidget() {
       if (user) {
         const { data: msgs } = await supabase
           .from('support_messages')
-          .select(`*, sender:profiles!support_messages_sender_id_fkey(username, avatar_url)`)
+          .select(`*, sender:profiles!sender_id(username, avatar_url)`)
           .eq('thread_id', currentThreadId)
           .order('created_at', { ascending: true });
 

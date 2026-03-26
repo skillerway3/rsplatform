@@ -94,16 +94,7 @@ function BrowseContent() {
       try {
         let query = supabase
           .from('listings')
-          .select(`
-            *,
-            seller:profiles!listings_seller_id_fkey (
-              username,
-              avatar_url,
-              is_verified_seller,
-              average_rating,
-              review_count
-            )
-          `)
+          .select('*')
           .eq('status', 'active');
 
         if (selectedGame !== 'all') {
@@ -123,29 +114,48 @@ function BrowseContent() {
           query = query.ilike('title', `%${searchQuery}%`);
         }
 
-        const { data, error: fetchError } = await query.order('created_at', { ascending: false });
+        const { data: listingsData, error: fetchError } = await query.order('created_at', { ascending: false });
 
         if (fetchError) throw fetchError;
         
-        // Transform data to match the expected Listing type if necessary
-        const transformedData = data?.map((item: any) => ({
-          ...item,
-          gameId: item.game,
-          categoryId: item.category,
-          sellerId: item.seller_id,
-          deliveryTime: 'Instant Delivery', // Default or from DB if added
-          deliveryMethod: 'In-game Trade', // Default or from DB if added
-          seller: {
-            id: item.seller_id,
-            username: item.seller?.username || 'Unknown',
-            avatar: item.seller?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.seller_id}`,
-            isVerified: item.seller?.is_verified_seller || false,
-            rating: item.seller?.average_rating || 0,
-            totalSales: item.seller?.review_count || 0,
-          }
-        }));
+        if (listingsData && listingsData.length > 0) {
+          // Fetch seller profiles in parallel
+          const sellerIds = Array.from(new Set(listingsData.map(l => l.seller_id)));
+          const { data: profilesData } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_url, is_verified_seller, average_rating, review_count')
+            .in('id', sellerIds);
 
-        setListings(transformedData || []);
+          const profileMap = (profilesData || []).reduce((acc, p) => {
+            acc[p.id] = p;
+            return acc;
+          }, {} as Record<string, any>);
+
+          // Transform data
+          const transformedData = listingsData.map((item: any) => {
+            const seller = profileMap[item.seller_id];
+            return {
+              ...item,
+              gameId: item.game,
+              categoryId: item.category,
+              sellerId: item.seller_id,
+              deliveryTime: 'Instant Delivery',
+              deliveryMethod: 'In-game Trade',
+              seller: {
+                id: item.seller_id,
+                username: seller?.username || 'Unknown',
+                avatar: seller?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.seller_id}`,
+                isVerified: seller?.is_verified_seller || false,
+                rating: seller?.average_rating || 0,
+                totalSales: seller?.review_count || 0,
+              }
+            };
+          });
+
+          setListings(transformedData);
+        } else {
+          setListings([]);
+        }
       } catch (err: any) {
         console.error('Error fetching listings:', err);
         setError(err.message);
@@ -208,10 +218,9 @@ const isBoostingSection =
 
   return (
     <div className="pt-32 pb-32 bg-zinc-950 min-h-screen relative overflow-hidden">
-      {/* Background Glows */}
+      {/* Background Glows - Simplified for performance */}
       <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-amber-500/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-zinc-100/5 rounded-full blur-[120px]" />
+        <div className="absolute top-[-5%] left-[-5%] w-[20%] h-[20%] bg-amber-500/5 rounded-full blur-[60px]" />
       </div>
 
       <div className="container mx-auto px-6 relative z-10">
@@ -277,7 +286,7 @@ const isBoostingSection =
             <motion.div 
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-zinc-900/30 backdrop-blur-md border border-zinc-800/50 rounded-3xl p-8"
+              className="bg-zinc-900/30 border border-zinc-800/50 rounded-3xl p-8"
             >
               <AccountFilters 
                 filters={accountFilters} 
@@ -482,7 +491,7 @@ const isBoostingSection =
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsFilterOpen(false)}
-              className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] lg:hidden"
+              className="fixed inset-0 bg-black/80 z-[100] lg:hidden"
             />
             <motion.div 
               initial={{ x: '100%' }}

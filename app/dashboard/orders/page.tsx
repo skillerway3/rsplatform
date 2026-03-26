@@ -33,18 +33,30 @@ interface Order {
   seller: {
     username: string;
     avatar_url: string;
-  };
+  } | {
+    username: string;
+    avatar_url: string;
+  }[];
   listing?: {
     id: string;
     title: string;
     category: string;
     images: string[];
-  };
+  } | {
+    id: string;
+    title: string;
+    category: string;
+    images: string[];
+  }[];
   request?: {
     id: string;
     title: string;
     category: string;
-  };
+  } | {
+    id: string;
+    title: string;
+    category: string;
+  }[];
 }
 
 export default function BuyerOrdersPage() {
@@ -58,19 +70,43 @@ export default function BuyerOrdersPage() {
     if (!user) return;
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      // Simplified query: Fetch orders first, then related data to avoid complex joins
+      const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
-        .select(`
-          *,
-          seller:profiles!seller_id(username, avatar_url),
-          listing:listings(id, title, category, images),
-          request:buyer_requests(id, title, category)
-        `)
+        .select('id, total_price, status, created_at, seller_id, listing_id, buyer_request_id')
         .eq('buyer_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setOrders(data || []);
+      if (ordersError) throw ordersError;
+      if (!ordersData || ordersData.length === 0) {
+        setOrders([]);
+        return;
+      }
+
+      // Fetch related data in parallel
+      const sellerIds = Array.from(new Set(ordersData.map(o => o.seller_id).filter(Boolean)));
+      const listingIds = Array.from(new Set(ordersData.map(o => o.listing_id).filter(Boolean)));
+      const requestIds = Array.from(new Set(ordersData.map(o => o.buyer_request_id).filter(Boolean)));
+
+      const [
+        { data: sellers },
+        { data: listings },
+        { data: requests }
+      ] = await Promise.all([
+        supabase.from('profiles').select('id, username, avatar_url').in('id', sellerIds),
+        supabase.from('listings').select('id, title, category, images').in('id', listingIds),
+        supabase.from('buyer_requests').select('id, title, category').in('id', requestIds)
+      ]);
+
+      // Map related data back to orders
+      const enrichedOrders = ordersData.map(order => ({
+        ...order,
+        seller: sellers?.find(s => s.id === order.seller_id) || { username: 'Unknown', avatar_url: '' },
+        listing: listings?.find(l => l.id === order.listing_id),
+        request: requests?.find(r => r.id === order.buyer_request_id)
+      }));
+
+      setOrders(enrichedOrders as any);
     } catch (err: any) {
       console.error('Error fetching orders:', err);
       setError(err.message);
@@ -96,15 +132,32 @@ export default function BuyerOrdersPage() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
+        <div className="text-center space-y-4 max-w-md">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
+          <h1 className="text-2xl font-black text-white uppercase tracking-widest">Orders Error</h1>
+          <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">{error}</p>
+          <button 
+            onClick={() => fetchOrders()}
+            className="px-8 py-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/10 transition-all"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const activeOrders = orders.filter(o => ['pending', 'accepted', 'processing', 'delivered'].includes(o.status));
   const completedOrders = orders.filter(o => ['completed', 'resolved', 'cancelled'].includes(o.status));
 
   return (
     <div className="min-h-screen pt-32 pb-20 bg-zinc-950 relative overflow-hidden">
-      {/* Background Glows */}
+      {/* Background Glows - Simplified for performance */}
       <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-amber-500/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-zinc-100/5 rounded-full blur-[120px]" />
+        <div className="absolute top-[-5%] left-[-5%] w-[20%] h-[20%] bg-amber-500/5 rounded-full blur-[60px]" />
       </div>
 
       <div className="container mx-auto px-6 relative z-10">
@@ -133,40 +186,40 @@ export default function BuyerOrdersPage() {
                         className="group bg-zinc-900/30 border border-white/5 rounded-3xl p-5 md:p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:bg-zinc-900/50 hover:border-amber-500/20 transition-all duration-500"
                       >
                         <div className="flex items-center gap-4 md:gap-6">
-                          <div className="relative w-14 h-14 rounded-2xl overflow-hidden border border-white/10 bg-zinc-950 shrink-0 group-hover:scale-110 transition-transform duration-500">
-                            {order.listing?.images?.[0] ? (
-                              <Image 
-                                src={order.listing.images[0]} 
-                                alt={order.listing.title} 
-                                fill 
-                                className="object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <Package className="w-6 h-6 text-zinc-800" />
+                            <div className="relative w-14 h-14 rounded-2xl overflow-hidden border border-white/10 bg-zinc-950 shrink-0 group-hover:scale-110 transition-transform duration-500">
+                              {(Array.isArray(order.listing) ? order.listing[0]?.images?.[0] : order.listing?.images?.[0]) ? (
+                                <Image 
+                                  src={Array.isArray(order.listing) ? order.listing[0].images[0] : order.listing!.images[0]} 
+                                  alt={Array.isArray(order.listing) ? order.listing[0].title : order.listing!.title} 
+                                  fill 
+                                  className="object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Package className="w-6 h-6 text-zinc-800" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2 mb-1">
+                                <h4 className="text-base md:text-lg font-black uppercase tracking-tighter text-white truncate">
+                                  {Array.isArray(order.listing) ? order.listing[0]?.title : order.listing?.title || (Array.isArray(order.request) ? order.request[0]?.title : order.request?.title) || 'Custom Order'}
+                                </h4>
+                                <div className={cn(
+                                  "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border",
+                                  order.status === 'pending' ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
+                                  order.status === 'delivered' ? "bg-purple-500/10 text-purple-500 border-purple-500/20" :
+                                  "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                                )}>
+                                  {order.status}
+                                </div>
                               </div>
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2 mb-1">
-                              <h4 className="text-base md:text-lg font-black uppercase tracking-tighter text-white truncate">
-                                {order.listing?.title || order.request?.title || 'Custom Order'}
-                              </h4>
-                              <div className={cn(
-                                "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border",
-                                order.status === 'pending' ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
-                                order.status === 'delivered' ? "bg-purple-500/10 text-purple-500 border-purple-500/20" :
-                                "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                              )}>
-                                {order.status}
+                              <div className="flex flex-wrap items-center gap-2 md:gap-3 text-[9px] md:text-[10px] font-black text-zinc-500 uppercase tracking-widest">
+                                <span>Seller: {Array.isArray(order.seller) ? order.seller[0]?.username : order.seller?.username}</span>
+                                <span className="hidden sm:inline w-1 h-1 rounded-full bg-zinc-800" />
+                                <span>{formatDate(order.created_at)}</span>
                               </div>
                             </div>
-                            <div className="flex flex-wrap items-center gap-2 md:gap-3 text-[9px] md:text-[10px] font-black text-zinc-500 uppercase tracking-widest">
-                              <span>Seller: {order.seller.username}</span>
-                              <span className="hidden sm:inline w-1 h-1 rounded-full bg-zinc-800" />
-                              <span>{formatDate(order.created_at)}</span>
-                            </div>
-                          </div>
                         </div>
 
                         <div className="flex items-center justify-between md:justify-end gap-6 border-t border-white/5 pt-4 md:border-0 md:pt-0">
@@ -207,7 +260,7 @@ export default function BuyerOrdersPage() {
                           </div>
                           <div>
                             <h4 className="text-md font-black uppercase tracking-tighter text-zinc-300">
-                              {order.listing?.title || order.request?.title || 'Custom Order'}
+                              {Array.isArray(order.listing) ? order.listing[0]?.title : order.listing?.title || (Array.isArray(order.request) ? order.request[0]?.title : order.request?.title) || 'Custom Order'}
                             </h4>
                             <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mt-1">
                               {order.status === 'completed' ? 'Completed' : 'Cancelled'} on {formatDate(order.created_at)}

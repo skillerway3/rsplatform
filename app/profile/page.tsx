@@ -45,7 +45,7 @@ interface Profile {
 }
 
 export default function ProfilePage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile: authProfile, loading: authLoading } = useAuth();
   const router = useRouter();
   const [profile, setProfile] = React.useState<Profile | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -63,27 +63,36 @@ export default function ProfilePage() {
       return;
     }
 
-    const fetchProfile = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
+    // Use authProfile if available, otherwise fetch once
+    if (authProfile) {
+      setProfile(authProfile as Profile);
+      setUsername(authProfile.username || '');
+      setLoading(false);
+    } else {
+      const fetchProfile = async () => {
+        try {
+          setLoading(true);
+          setError(null);
+          
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_url, is_verified_seller, is_trusted_seller, created_at, role')
+            .eq('id', user.id)
+            .single();
 
-        if (error) throw error;
-        setProfile(data);
-        setUsername(data.username || '');
-      } catch (err: any) {
-        console.error('Error fetching profile:', err);
-        setError('Failed to load profile');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProfile();
-  }, [user, authLoading, router]);
+          if (error) throw error;
+          setProfile(data as Profile);
+          setUsername(data?.username || '');
+        } catch (err: any) {
+          console.error('Error fetching profile:', err);
+          setError('Failed to load profile');
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchProfile();
+    }
+  }, [user, authLoading, authProfile, router]);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,12 +193,29 @@ export default function ProfilePage() {
     );
   }
 
+  if (error && !profile) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
+        <div className="text-center space-y-4 max-w-md">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
+          <h1 className="text-2xl font-black text-white uppercase tracking-widest">Error Loading Profile</h1>
+          <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-8 py-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/10 transition-all"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="pt-32 pb-32 bg-zinc-950 min-h-screen relative overflow-hidden">
-      {/* Background Glows */}
+      {/* Background Glows - Simplified for performance */}
       <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-amber-500/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-zinc-100/5 rounded-full blur-[120px]" />
+        <div className="absolute top-[-5%] left-[-5%] w-[20%] h-[20%] bg-amber-500/5 rounded-full blur-[60px]" />
       </div>
 
       <div className="container mx-auto px-6 relative z-10">

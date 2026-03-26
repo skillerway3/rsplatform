@@ -49,7 +49,7 @@ export function NotificationDropdown() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.98 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
-            className="absolute top-full right-[-1rem] md:right-0 mt-4 w-[calc(100vw-2rem)] md:w-96 bg-zinc-950/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden z-[60]"
+            className="absolute top-full right-[-1rem] md:right-0 mt-4 w-[calc(100vw-2rem)] md:w-96 bg-zinc-950/95 border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden z-[60]"
           >
             <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between bg-zinc-900/50">
               <h3 className="text-xs font-black uppercase tracking-[0.2em] text-white">Notifications</h3>

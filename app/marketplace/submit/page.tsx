@@ -169,7 +169,7 @@ export default function SubmitRequestPage() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6 md:space-y-8">
-              <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 backdrop-blur-xl space-y-6 md:space-y-8">
+              <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 space-y-6 md:space-y-8">
                 <div className="space-y-6">
                   <div className="space-y-3">
                     <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.4em] ml-1">Request Title</label>

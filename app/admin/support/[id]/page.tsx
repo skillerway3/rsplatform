@@ -50,21 +50,44 @@ export default function AdminSupportDetailPage() {
           { data: threadData, error: threadError },
           { data: messagesData }
         ] = await Promise.all([
-          supabase.from('support_threads').select(`
-            *,
-            user:profiles!support_threads_user_id_fkey(*),
-            assigned_admin:profiles!support_threads_assigned_to_fkey(*)
-          `).eq('id', id).single(),
-          supabase.from('support_messages').select(`
-            *,
-            sender:profiles!support_messages_sender_id_fkey(*)
-          `).eq('thread_id', id).order('created_at', { ascending: true })
+          supabase.from('support_threads').select('*').eq('id', id).single(),
+          supabase.from('support_messages').select('*').eq('thread_id', id).order('created_at', { ascending: true })
         ]);
 
         if (threadError) throw threadError;
 
-        setThread(threadData);
-        setMessages(messagesData || []);
+        // Fetch related profiles in parallel
+        const profileIds = new Set<string>();
+        if (threadData.user_id) profileIds.add(threadData.user_id);
+        if (threadData.assigned_to) profileIds.add(threadData.assigned_to);
+        messagesData?.forEach(m => {
+          if (m.sender_id) profileIds.add(m.sender_id);
+        });
+
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('id', Array.from(profileIds));
+
+        const profileMap = (profilesData || []).reduce((acc, p) => {
+          acc[p.id] = p;
+          return acc;
+        }, {} as Record<string, any>);
+
+        // Transform data
+        const transformedThread = {
+          ...threadData,
+          user: profileMap[threadData.user_id] || null,
+          assigned_admin: profileMap[threadData.assigned_to] || null
+        };
+
+        const transformedMessages = (messagesData || []).map(msg => ({
+          ...msg,
+          sender: profileMap[msg.sender_id] || null
+        }));
+
+        setThread(transformedThread);
+        setMessages(transformedMessages);
       } catch (error) {
         console.error('Error fetching thread detail:', error);
         router.push('/admin/support');
@@ -86,12 +109,23 @@ export default function AdminSupportDetailPage() {
       }, async (payload) => {
         const { data: newMessageData } = await supabase
           .from('support_messages')
-          .select(`*, sender:profiles!support_messages_sender_id_fkey(*)`)
+          .select('*')
           .eq('id', payload.new.id)
           .single();
         
         if (newMessageData) {
-          setMessages(prev => [...prev, newMessageData]);
+          // Fetch sender profile
+          const { data: senderData } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', newMessageData.sender_id)
+            .single();
+
+          const transformedMessage = {
+            ...newMessageData,
+            sender: senderData || null
+          };
+          setMessages(prev => [...prev, transformedMessage]);
         }
       })
       .subscribe();

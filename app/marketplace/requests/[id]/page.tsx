@@ -308,7 +308,7 @@ export default function SellerRequestPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           {/* Left Column: Request Details */}
           <div className="lg:col-span-2 space-y-8">
-            <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-10 backdrop-blur-xl relative overflow-hidden">
+            <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-10 relative overflow-hidden">
               <div className="absolute top-0 right-0 p-10">
                 <div className={cn(
                   "px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border",
@@ -342,7 +342,7 @@ export default function SellerRequestPage() {
               </h2>
 
               {order && order.status === 'processing' ? (
-                <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-10 backdrop-blur-xl space-y-8">
+                <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-10 space-y-8">
                   <div className="flex items-center gap-4 mb-2">
                     <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center">
                       <Zap className="w-6 h-6 text-amber-500" />
@@ -399,7 +399,7 @@ export default function SellerRequestPage() {
                   </form>
                 </div>
               ) : order && (order.status === 'delivered' || order.status === 'completed') ? (
-                <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-10 backdrop-blur-xl space-y-8">
+                <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-10 space-y-8">
                   <div className="flex items-center gap-4 mb-2">
                     <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center">
                       <CheckCircle2 className="w-6 h-6 text-emerald-500" />
@@ -470,7 +470,7 @@ export default function SellerRequestPage() {
                   <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">This request is no longer accepting offers.</p>
                 </div>
               ) : (
-                <form onSubmit={handleSubmitOffer} className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-10 backdrop-blur-xl space-y-8">
+                <form onSubmit={handleSubmitOffer} className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-10 space-y-8">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-3">
                       <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em] ml-1">Your Price ($)</label>
@@ -543,7 +543,7 @@ export default function SellerRequestPage() {
 
           {/* Right Column: Buyer Info */}
           <div className="space-y-8">
-            <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-8 backdrop-blur-xl">
+            <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-8">
               <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.4em] mb-8">Buyer Information</h3>
               
               <div className="space-y-6">

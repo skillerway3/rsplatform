@@ -33,7 +33,7 @@ const ADMIN_NAV = [
   { label: 'Orders', href: '/admin/orders', icon: ShoppingBag },
   { label: 'Listings', href: '/admin/listings', icon: List },
   { label: 'Buyer Requests', href: '/admin/requests', icon: MessageSquare },
-  { label: 'Support', href: '/admin/support', icon: ShieldCheck },
+  { label: 'Support', href: '/admin/support/threads', icon: ShieldCheck },
   { label: 'Disputes', href: '/admin/disputes', icon: AlertCircle },
   { label: 'Verifications', href: '/admin/verifications', icon: UserCheck },
   { label: 'Sellers', href: '/admin/sellers', icon: ShieldCheck },

@@ -52,7 +52,7 @@ export default function MyListingsPage() {
       setLoading(true);
       const { data, error } = await supabase
         .from('listings')
-        .select('*')
+        .select('id, title, price, status, created_at, game, category, images')
         .eq('seller_id', user.id)
         .order('created_at', { ascending: false });
 
@@ -121,12 +121,29 @@ export default function MyListingsPage() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
+        <div className="text-center space-y-4 max-w-md">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
+          <h1 className="text-2xl font-black text-white uppercase tracking-widest">Listings Error</h1>
+          <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">{error}</p>
+          <button 
+            onClick={() => fetchListings()}
+            className="px-8 py-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/10 transition-all"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen pt-32 pb-20 bg-zinc-950 relative overflow-hidden">
-      {/* Background Glows */}
+      {/* Background Glows - Simplified for performance */}
       <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-amber-500/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-zinc-100/5 rounded-full blur-[120px]" />
+        <div className="absolute top-[-5%] left-[-5%] w-[20%] h-[20%] bg-amber-500/5 rounded-full blur-[60px]" />
       </div>
 
       <div className="container mx-auto px-6 relative z-10">

@@ -42,7 +42,13 @@ interface Offer {
     average_rating: number;
     review_count: number;
     is_trusted_seller: boolean;
-  };
+  } | {
+    username: string;
+    avatar_url: string;
+    average_rating: number;
+    review_count: number;
+    is_trusted_seller: boolean;
+  }[];
 }
 
 interface BuyerRequest {
@@ -70,34 +76,63 @@ export default function BuyerRequestsPage() {
     if (!user) return;
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      // Simplified query: Fetch requests first, then offers and sellers in separate steps
+      const { data: requestsData, error: requestsError } = await supabase
         .from('buyer_requests')
-        .select(`
-          *,
-          offers:buyer_request_offers(
-            *,
-            seller:profiles!seller_id(username, avatar_url, average_rating, review_count, is_trusted_seller)
-          )
-        `)
+        .select('id, title, description, category, game, status, created_at, expires_at')
         .eq('buyer_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (requestsError) throw requestsError;
+      if (!requestsData || requestsData.length === 0) {
+        setRequests([]);
+        return;
+      }
 
-      // Sort offers for each request
-      const sortedData = (data || []).map(req => ({
-        ...req,
-        offers: [...(req.offers || [])].sort((a, b) => {
-          // 1. Trusted sellers first
-          if (a.seller.is_trusted_seller && !b.seller.is_trusted_seller) return -1;
-          if (!a.seller.is_trusted_seller && b.seller.is_trusted_seller) return 1;
-          
-          // 2. Then by price (lowest to highest)
-          return a.price - b.price;
-        })
-      }));
+      const requestIds = requestsData.map(r => r.id);
 
-      setRequests(sortedData);
+      // Fetch offers for these requests
+      const { data: offersData, error: offersError } = await supabase
+        .from('buyer_request_offers')
+        .select('id, buyer_request_id, seller_id, price, delivery_time, message, status, created_at')
+        .in('buyer_request_id', requestIds);
+
+      if (offersError) throw offersError;
+
+      // Fetch sellers for these offers
+      const sellerIds = Array.from(new Set(offersData?.map(o => o.seller_id).filter(Boolean) || []));
+      let sellers: any[] = [];
+      if (sellerIds.length > 0) {
+        const { data: sellersData } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url, average_rating, review_count, is_trusted_seller')
+          .in('id', sellerIds);
+        sellers = sellersData || [];
+      }
+
+      // Map everything back together
+      const enrichedRequests = requestsData.map(req => {
+        const reqOffers = (offersData || [])
+          .filter(o => o.buyer_request_id === req.id)
+          .map(offer => ({
+            ...offer,
+            seller: sellers.find(s => s.id === offer.seller_id) || { username: 'Unknown', avatar_url: '' }
+          }))
+          .sort((a, b) => {
+            const sellerA = a.seller;
+            const sellerB = b.seller;
+            if (sellerA?.is_trusted_seller && !sellerB?.is_trusted_seller) return -1;
+            if (!sellerA?.is_trusted_seller && sellerB?.is_trusted_seller) return 1;
+            return a.price - b.price;
+          });
+
+        return {
+          ...req,
+          offers: reqOffers
+        };
+      });
+
+      setRequests(enrichedRequests as any);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -124,11 +159,41 @@ export default function BuyerRequestsPage() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
+        <div className="text-center space-y-4 max-w-md">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
+          <h1 className="text-2xl font-black text-white uppercase tracking-widest">Requests Error</h1>
+          <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">{error}</p>
+          <button 
+            onClick={() => fetchRequests()}
+            className="px-8 py-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/10 transition-all"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!user) return null;
 
   return (
-    <div className="min-h-screen pt-32 pb-20 bg-zinc-950">
-      <div className="container mx-auto px-6">
+    <div className="min-h-screen pt-32 pb-20 bg-zinc-950 relative overflow-hidden">
+      {/* Background Glows - Simplified for performance */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute top-[-5%] left-[-5%] w-[20%] h-[20%] bg-amber-500/5 rounded-full blur-[60px]" />
+      </div>
+      <div className="container mx-auto px-6 relative z-10">
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 gap-6">
           <div>
             <h1 className="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">My <span className="text-amber-500">Requests</span></h1>
@@ -197,16 +262,16 @@ export default function BuyerRequestsPage() {
                           <div className="flex items-center gap-4">
                             <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-white/10 shrink-0">
                               <Image
-                                src={offer.seller.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${offer.seller.username}`}
-                                alt={offer.seller.username}
+                                src={(Array.isArray(offer.seller) ? offer.seller[0]?.avatar_url : offer.seller?.avatar_url) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${Array.isArray(offer.seller) ? offer.seller[0]?.username : offer.seller?.username}`}
+                                alt={Array.isArray(offer.seller) ? offer.seller[0]?.username : offer.seller?.username || 'Seller'}
                                 fill
                                 className="object-cover"
                               />
                             </div>
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-2 mb-1">
-                                <h4 className="text-sm font-black uppercase tracking-widest text-white truncate">{offer.seller.username}</h4>
-                                {offer.seller.is_trusted_seller && (
+                                <h4 className="text-sm font-black uppercase tracking-widest text-white truncate">{Array.isArray(offer.seller) ? offer.seller[0]?.username : offer.seller?.username}</h4>
+                                {(Array.isArray(offer.seller) ? offer.seller[0]?.is_trusted_seller : offer.seller?.is_trusted_seller) && (
                                   <div className="flex items-center px-1.5 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded text-[7px] font-black text-amber-500 uppercase tracking-widest">
                                     <ShieldCheck className="w-2.5 h-2.5 mr-1" />
                                     Trusted
@@ -214,7 +279,7 @@ export default function BuyerRequestsPage() {
                                 )}
                                 <div className="flex items-center text-[10px] text-amber-500">
                                   <Zap className="w-3 h-3 mr-1 fill-amber-500" />
-                                  <span>{offer.seller.average_rating} ({offer.seller.review_count})</span>
+                                  <span>{Array.isArray(offer.seller) ? offer.seller[0]?.average_rating : offer.seller?.average_rating} ({Array.isArray(offer.seller) ? offer.seller[0]?.review_count : offer.seller?.review_count})</span>
                                 </div>
                               </div>
                               <p className="text-xs text-zinc-500 line-clamp-1 italic">&quot;{offer.message}&quot;</p>

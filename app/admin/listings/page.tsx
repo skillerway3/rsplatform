@@ -50,19 +50,38 @@ export default function AdminListingsPage() {
     try {
       let query = supabase
         .from('listings')
-        .select(`
-          *,
-          seller:profiles!listings_seller_id_fkey(username)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (statusFilter !== 'all') {
         query = query.eq('status', statusFilter);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      setListings(data || []);
+      const { data: listingsData, error: listingsError } = await query;
+      if (listingsError) throw listingsError;
+
+      if (listingsData && listingsData.length > 0) {
+        // Fetch seller profiles in parallel
+        const sellerIds = Array.from(new Set(listingsData.map(l => l.seller_id)));
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, username')
+          .in('id', sellerIds);
+
+        const profileMap = (profilesData || []).reduce((acc, p) => {
+          acc[p.id] = p;
+          return acc;
+        }, {} as Record<string, any>);
+
+        const transformedListings = listingsData.map(listing => ({
+          ...listing,
+          seller: profileMap[listing.seller_id] || null
+        }));
+
+        setListings(transformedListings);
+      } else {
+        setListings([]);
+      }
     } catch (error) {
       console.error('Error fetching listings:', error);
     } finally {

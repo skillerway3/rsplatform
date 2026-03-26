@@ -637,7 +637,7 @@ export default function OrderPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-12">
           {/* Left Column: Order/Request Details */}
           <div className="lg:col-span-2 space-y-8">
-            <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 backdrop-blur-xl relative overflow-hidden">
+            <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 relative overflow-hidden">
               <div className="absolute top-0 right-0 p-6 md:p-10">
                 <div className={cn(
                   "px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border",
@@ -669,7 +669,7 @@ export default function OrderPage() {
             </div>
 
             {order && order.status === 'completed' && isBuyer && (
-              <div className="bg-gradient-to-br from-amber-500/10 to-zinc-900/40 border border-amber-500/20 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 backdrop-blur-xl space-y-8 shadow-lg shadow-amber-500/5">
+              <div className="bg-gradient-to-br from-amber-500/10 to-zinc-900/40 border border-amber-500/20 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 space-y-8 shadow-lg shadow-amber-500/5">
                 <div className="flex flex-col md:flex-row md:items-center gap-4">
                   <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
                     <Zap className="w-6 h-6 text-zinc-950" />
@@ -743,7 +743,7 @@ export default function OrderPage() {
             )}
 
             {order && order.status === 'delivered' && (
-              <div className="bg-amber-500/5 border border-amber-500/20 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 backdrop-blur-xl space-y-8">
+              <div className="bg-amber-500/5 border border-amber-500/20 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 space-y-8">
                 <div className="flex flex-col md:flex-row md:items-center gap-4">
                   <div className="flex items-center gap-4 w-full md:w-auto">
                     <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center shrink-0">
@@ -825,7 +825,7 @@ export default function OrderPage() {
               </div>
 
               {orderType === 'direct' ? (
-                <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2rem] p-8 backdrop-blur-xl">
+                <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2rem] p-8">
                   <div className="flex items-center justify-between p-6 bg-zinc-950/50 rounded-2xl border border-white/5">
                     <div className="space-y-1">
                       <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Amount Paid</p>
@@ -954,7 +954,7 @@ export default function OrderPage() {
           {/* Right Column: Status & Info */}
           <div className="space-y-8">
             {isSeller && order && order.status === 'processing' && (
-              <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-8 backdrop-blur-xl space-y-8">
+              <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-8 space-y-8">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center">
                     <Truck className="w-6 h-6 text-amber-500" />
@@ -1007,7 +1007,7 @@ export default function OrderPage() {
               </div>
             )}
 
-            <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-8 backdrop-blur-xl">
+            <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-8">
               <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.4em] mb-8">
                 {orderType === 'direct' ? 'Order Status' : 'Request Status'}
               </h3>

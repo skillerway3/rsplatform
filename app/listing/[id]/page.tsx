@@ -75,38 +75,36 @@ export default function ListingDetailPage() {
     const fetchListing = async () => {
       setLoading(true);
       try {
-        const { data, error: fetchError } = await supabase
+        // Fetch listing first
+        const { data: listingData, error: fetchError } = await supabase
           .from('listings')
-          .select(`
-            *,
-            seller:profiles!listings_seller_id_fkey (
-              username,
-              avatar_url,
-              is_verified_seller,
-              is_trusted_seller,
-              average_rating,
-              review_count
-            )
-          `)
+          .select('*')
           .eq('id', id)
           .single();
 
         if (fetchError) throw fetchError;
         
+        // Fetch seller profile separately
+        const { data: sellerData } = await supabase
+          .from('profiles')
+          .select('username, avatar_url, is_verified_seller, is_trusted_seller, average_rating, review_count')
+          .eq('id', listingData.seller_id)
+          .single();
+
         const transformedListing = {
-          ...data,
-          gameId: data.game,
-          categoryId: data.category,
+          ...listingData,
+          gameId: listingData.game,
+          categoryId: listingData.category,
           deliveryTime: 'Instant Delivery',
           deliveryMethod: 'In-game Trade',
           seller: {
-            id: data.seller_id,
-            username: data.seller?.username || 'Unknown',
-            avatar: data.seller?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.seller_id}`,
-            isVerified: data.seller?.is_verified_seller || false,
-            isTrusted: data.seller?.is_trusted_seller || false,
-            rating: data.seller?.average_rating || 0,
-            totalSales: data.seller?.review_count || 0,
+            id: listingData.seller_id,
+            username: sellerData?.username || 'Unknown',
+            avatar: sellerData?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${listingData.seller_id}`,
+            isVerified: sellerData?.is_verified_seller || false,
+            isTrusted: sellerData?.is_trusted_seller || false,
+            rating: sellerData?.average_rating || 0,
+            totalSales: sellerData?.review_count || 0,
           }
         };
 
@@ -150,10 +148,9 @@ export default function ListingDetailPage() {
 
   return (
     <div className="pt-32 pb-32 bg-zinc-950 min-h-screen relative overflow-hidden">
-      {/* Background Glows */}
+      {/* Background Glows - Simplified for performance */}
       <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-amber-500/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-zinc-100/5 rounded-full blur-[120px]" />
+        <div className="absolute top-[-5%] left-[-5%] w-[20%] h-[20%] bg-amber-500/5 rounded-full blur-[60px]" />
       </div>
 
       <div className="container mx-auto px-6 relative z-10">
@@ -191,7 +188,7 @@ export default function ListingDetailPage() {
                   <Badge variant="gold" className="px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] shadow-xl">
                     {listing.gameId}
                   </Badge>
-                  <Badge className="px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] bg-black/60 backdrop-blur-xl border border-white/10 shadow-xl">
+                  <Badge className="px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] bg-black/60 border border-white/10 shadow-xl">
                     {listing.categoryId}
                   </Badge>
                 </div>
@@ -327,7 +324,7 @@ export default function ListingDetailPage() {
           <div className="lg:col-span-4 space-y-8">
             {/* Purchase Card */}
             <div className="sticky top-32 space-y-8">
-              <Card className="border-zinc-800 bg-zinc-950/80 backdrop-blur-2xl rounded-[2.5rem] overflow-hidden shadow-2xl">
+              <Card className="border-zinc-800 bg-zinc-950/80 rounded-[2.5rem] overflow-hidden shadow-2xl">
                 <CardContent className="p-10 space-y-10">
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
@@ -423,7 +420,7 @@ export default function ListingDetailPage() {
               </Card>
 
               {/* Seller Card */}
-              <Card className="border-zinc-900 bg-zinc-950/40 backdrop-blur-md rounded-[2.5rem] overflow-hidden">
+              <Card className="border-zinc-900 bg-zinc-950/40 rounded-[2.5rem] overflow-hidden">
                 <CardContent className="p-10 space-y-8">
                   <div className="flex items-center justify-between">
                     <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em]">Merchant Profile</h3>

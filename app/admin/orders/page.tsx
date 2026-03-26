@@ -33,22 +33,50 @@ export default function AdminOrdersPage() {
 
   React.useEffect(() => {
     async function fetchOrders() {
+      setLoading(true);
       try {
-        let query = supabase.from('orders').select(`
-          *,
-          buyer:profiles!orders_buyer_id_fkey(username, avatar_url),
-          seller:profiles!orders_seller_id_fkey(username, avatar_url),
-          listing:listings(title, price, image_url)
-        `).order('created_at', { ascending: false });
+        let query = supabase.from('orders').select('*').order('created_at', { ascending: false });
 
         if (filter === 'pending') query = query.eq('status', 'pending');
         if (filter === 'completed') query = query.eq('status', 'completed');
         if (filter === 'cancelled') query = query.eq('status', 'cancelled');
         if (filter === 'disputed') query = query.eq('status', 'disputed');
 
-        const { data, error } = await query;
-        if (error) throw error;
-        setOrders(data || []);
+        const { data: ordersData, error: ordersError } = await query;
+        if (ordersError) throw ordersError;
+
+        if (ordersData && ordersData.length > 0) {
+          // Fetch related data in parallel
+          const buyerIds = Array.from(new Set(ordersData.map(o => o.buyer_id)));
+          const sellerIds = Array.from(new Set(ordersData.map(o => o.seller_id)));
+          const listingIds = Array.from(new Set(ordersData.map(o => o.listing_id)));
+
+          const [profilesResponse, listingsResponse] = await Promise.all([
+            supabase.from('profiles').select('id, username, avatar_url').in('id', [...new Set([...buyerIds, ...sellerIds])]),
+            supabase.from('listings').select('id, title, price, image_url').in('id', listingIds)
+          ]);
+
+          const profileMap = (profilesResponse.data || []).reduce((acc, p) => {
+            acc[p.id] = p;
+            return acc;
+          }, {} as Record<string, any>);
+
+          const listingMap = (listingsResponse.data || []).reduce((acc, l) => {
+            acc[l.id] = l;
+            return acc;
+          }, {} as Record<string, any>);
+
+          const transformedOrders = ordersData.map(order => ({
+            ...order,
+            buyer: profileMap[order.buyer_id] || null,
+            seller: profileMap[order.seller_id] || null,
+            listing: listingMap[order.listing_id] || null
+          }));
+
+          setOrders(transformedOrders);
+        } else {
+          setOrders([]);
+        }
       } catch (error) {
         console.error('Error fetching orders:', error);
       } finally {

@@ -48,19 +48,38 @@ export default function AdminRequestsPage() {
     try {
       let query = supabase
         .from('requests')
-        .select(`
-          *,
-          user:profiles!requests_user_id_fkey(username)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (statusFilter !== 'all') {
         query = query.eq('status', statusFilter);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      setRequests(data || []);
+      const { data: requestsData, error: requestsError } = await query;
+      if (requestsError) throw requestsError;
+
+      if (requestsData && requestsData.length > 0) {
+        // Fetch user profiles in parallel
+        const userIds = Array.from(new Set(requestsData.map(r => r.user_id)));
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, username')
+          .in('id', userIds);
+
+        const profileMap = (profilesData || []).reduce((acc, p) => {
+          acc[p.id] = p;
+          return acc;
+        }, {} as Record<string, any>);
+
+        const transformedRequests = requestsData.map(request => ({
+          ...request,
+          user: profileMap[request.user_id] || null
+        }));
+
+        setRequests(transformedRequests);
+      } else {
+        setRequests([]);
+      }
     } catch (error) {
       console.error('Error fetching requests:', error);
     } finally {

@@ -37,10 +37,7 @@ export default function AdminWithdrawalsPage() {
     try {
       let query = supabase
         .from("wallet_transactions")
-        .select(`
-          *,
-          profiles:user_id (id, email, full_name, username)
-        `)
+        .select("id, user_id, amount, type, status, created_at, processed_at, admin_notes")
         .eq("type", "withdrawal")
         .order("created_at", { ascending: false });
 
@@ -48,9 +45,32 @@ export default function AdminWithdrawalsPage() {
         query = query.eq("status", filter);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      setWithdrawals(data || []);
+      const { data: txData, error: txError } = await query;
+      if (txError) throw txError;
+
+      if (txData && txData.length > 0) {
+        // Fetch profiles in parallel
+        const userIds = Array.from(new Set(txData.map(tx => tx.user_id)));
+        const { data: profilesData } = await supabase
+          .from("profiles")
+          .select("id, full_name, username")
+          .in("id", userIds);
+
+        const profileMap = (profilesData || []).reduce((acc, p) => {
+          acc[p.id] = p;
+          return acc;
+        }, {} as Record<string, any>);
+
+        // Map profiles back to transactions
+        const enrichedTx = txData.map(tx => ({
+          ...tx,
+          profiles: profileMap[tx.user_id] || null
+        }));
+
+        setWithdrawals(enrichedTx);
+      } else {
+        setWithdrawals([]);
+      }
     } catch (err) {
       console.error("Error fetching withdrawals:", err);
     } finally {
@@ -88,15 +108,20 @@ export default function AdminWithdrawalsPage() {
     }
   }
 
-  const filteredWithdrawals = withdrawals.filter(tx => 
-    tx.profiles?.email?.toLowerCase().includes(search.toLowerCase()) ||
-    tx.profiles?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-    tx.id.includes(search)
-  );
+  const filteredWithdrawals = withdrawals.filter(tx => {
+    const profile = Array.isArray(tx.profiles) ? tx.profiles[0] : tx.profiles;
+    return profile?.username?.toLowerCase().includes(search.toLowerCase()) ||
+           profile?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+           tx.id.includes(search);
+  });
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-white p-4 md:p-8 font-sans">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-[#0A0A0A] text-white p-4 md:p-8 font-sans relative overflow-hidden">
+      {/* Background Glows - Simplified for performance */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute top-[-5%] left-[-5%] w-[20%] h-[20%] bg-[#D4AF37]/5 rounded-full blur-[60px]" />
+      </div>
+      <div className="max-w-7xl mx-auto relative z-10">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
           <div>
@@ -175,8 +200,14 @@ export default function AdminWithdrawalsPage() {
                             <User className="w-5 h-5" />
                           </div>
                           <div>
-                            <div className="font-medium">{tx.profiles?.full_name || tx.profiles?.username || "Unknown"}</div>
-                            <div className="text-xs text-gray-500">{tx.profiles?.email}</div>
+                            <div className="font-medium">
+                              {(Array.isArray(tx.profiles) ? tx.profiles[0]?.full_name : tx.profiles?.full_name) || 
+                               (Array.isArray(tx.profiles) ? tx.profiles[0]?.username : tx.profiles?.username) || 
+                               "Unknown"}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              @{Array.isArray(tx.profiles) ? tx.profiles[0]?.username : tx.profiles?.username}
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -244,8 +275,12 @@ export default function AdminWithdrawalsPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-white/5 p-4 rounded-xl">
                       <div className="text-xs text-gray-500 uppercase font-bold mb-1">User</div>
-                      <div className="font-medium">{selectedTx.profiles?.full_name}</div>
-                      <div className="text-xs text-gray-400">{selectedTx.profiles?.email}</div>
+                      <div className="font-medium">
+                        {Array.isArray(selectedTx.profiles) ? selectedTx.profiles[0]?.full_name : selectedTx.profiles?.full_name}
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        @{Array.isArray(selectedTx.profiles) ? selectedTx.profiles[0]?.username : selectedTx.profiles?.username}
+                      </div>
                     </div>
                     <div className="bg-white/5 p-4 rounded-xl">
                       <div className="text-xs text-gray-500 uppercase font-bold mb-1">Amount</div>

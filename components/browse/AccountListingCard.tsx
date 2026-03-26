@@ -20,7 +20,7 @@ export function AccountListingCard({ listing }: AccountListingCardProps) {
 
   return (
     <Link href={`/listing/${listing.id}`}>
-      <Card className="overflow-hidden border-zinc-800/50 bg-zinc-950/40 backdrop-blur-md group hover:border-amber-500/40 transition-all duration-500 hover:shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
+      <Card className="overflow-hidden border-zinc-800/50 bg-zinc-950/40 group hover:border-amber-500/40 transition-all duration-500 hover:shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
         <div className="grid grid-cols-1 lg:grid-cols-12">
           {/* Image Section */}
           <div className="lg:col-span-3 aspect-[16/10] lg:aspect-auto relative bg-zinc-900 overflow-hidden border-b lg:border-b-0 lg:border-r border-zinc-800/50">
@@ -40,7 +40,7 @@ export function AccountListingCard({ listing }: AccountListingCardProps) {
             
             {/* Overlay Badges */}
             <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
-              <div className="bg-black/80 backdrop-blur-md border border-white/10 px-2.5 py-1 rounded-md flex items-center gap-2">
+              <div className="bg-black/80 border border-white/10 px-2.5 py-1 rounded-md flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                 <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white">{listing.gameId}</span>
               </div>

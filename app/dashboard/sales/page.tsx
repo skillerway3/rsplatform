@@ -34,15 +34,24 @@ interface Order {
   buyer: {
     username: string;
     avatar_url: string;
-  };
+  } | {
+    username: string;
+    avatar_url: string;
+  }[];
   listing?: {
     title: string;
     category: string;
-  };
+  } | {
+    title: string;
+    category: string;
+  }[];
   request?: {
     title: string;
     category: string;
-  };
+  } | {
+    title: string;
+    category: string;
+  }[];
 }
 
 export default function SellerSalesPage() {
@@ -55,19 +64,43 @@ export default function SellerSalesPage() {
     if (!user) return;
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      // Simplified query: Fetch orders first, then related data
+      const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
-        .select(`
-          *,
-          buyer:profiles!buyer_id(username, avatar_url),
-          listing:listings(title, category),
-          request:buyer_requests(title, category)
-        `)
+        .select('id, total_price, platform_fee, seller_payout, status, created_at, buyer_id, listing_id, buyer_request_id')
         .eq('seller_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setOrders(data || []);
+      if (ordersError) throw ordersError;
+      if (!ordersData || ordersData.length === 0) {
+        setOrders([]);
+        return;
+      }
+
+      // Fetch related data in parallel
+      const buyerIds = Array.from(new Set(ordersData.map(o => o.buyer_id).filter(Boolean)));
+      const listingIds = Array.from(new Set(ordersData.map(o => o.listing_id).filter(Boolean)));
+      const requestIds = Array.from(new Set(ordersData.map(o => o.buyer_request_id).filter(Boolean)));
+
+      const [
+        { data: buyers },
+        { data: listings },
+        { data: requests }
+      ] = await Promise.all([
+        supabase.from('profiles').select('id, username, avatar_url').in('id', buyerIds),
+        supabase.from('listings').select('id, title, category').in('id', listingIds),
+        supabase.from('buyer_requests').select('id, title, category').in('id', requestIds)
+      ]);
+
+      // Map related data back to orders
+      const enrichedOrders = ordersData.map(order => ({
+        ...order,
+        buyer: buyers?.find(b => b.id === order.buyer_id) || { username: 'Unknown', avatar_url: '' },
+        listing: listings?.find(l => l.id === order.listing_id),
+        request: requests?.find(r => r.id === order.buyer_request_id)
+      }));
+
+      setOrders(enrichedOrders as any);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -79,6 +112,32 @@ export default function SellerSalesPage() {
     fetchSales();
   }, [fetchSales]);
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
+        <div className="text-center space-y-4 max-w-md">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
+          <h1 className="text-2xl font-black text-white uppercase tracking-widest">Sales Error</h1>
+          <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">{error}</p>
+          <button 
+            onClick={() => fetchSales()}
+            className="px-8 py-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/10 transition-all"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!user) return null;
 
   const activeSales = orders.filter(o => ['pending', 'processing', 'delivered'].includes(o.status));
@@ -88,8 +147,12 @@ export default function SellerSalesPage() {
   const pendingEarnings = orders.reduce((acc, o) => acc + (['processing', 'delivered'].includes(o.status) ? (o.seller_payout || (o.total_price * 0.95)) : 0), 0);
 
   return (
-    <div className="min-h-screen pt-32 pb-20 bg-zinc-950">
-      <div className="container mx-auto px-6">
+    <div className="min-h-screen pt-32 pb-20 bg-zinc-950 relative overflow-hidden">
+      {/* Background Glows - Simplified for performance */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute top-[-5%] left-[-5%] w-[20%] h-[20%] bg-amber-500/5 rounded-full blur-[60px]" />
+      </div>
+      <div className="container mx-auto px-6 relative z-10">
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 gap-8">
           <div>
             <h1 className="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">My <span className="text-amber-500">Sales</span></h1>
@@ -133,24 +196,24 @@ export default function SellerSalesPage() {
                         <div className="w-12 h-12 md:w-14 md:h-14 bg-amber-500/10 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
                           <Package className="w-6 h-6 md:w-7 md:h-7 text-amber-500" />
                         </div>
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2 mb-1">
-                            <h4 className="text-base md:text-lg font-black uppercase tracking-tighter text-white truncate">
-                              {order.listing?.title || order.request?.title || 'Custom Order'}
-                            </h4>
-                            <div className={cn(
-                              "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border",
-                              order.status === 'processing' ? "bg-amber-500/10 text-amber-500 border-amber-500/20" : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                            )}>
-                              {order.status}
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                              <h4 className="text-base md:text-lg font-black uppercase tracking-tighter text-white truncate">
+                                {Array.isArray(order.listing) ? order.listing[0]?.title : order.listing?.title || (Array.isArray(order.request) ? order.request[0]?.title : order.request?.title) || 'Custom Order'}
+                              </h4>
+                              <div className={cn(
+                                "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border",
+                                order.status === 'processing' ? "bg-amber-500/10 text-amber-500 border-amber-500/20" : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                              )}>
+                                {order.status}
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 md:gap-3 text-[9px] md:text-[10px] font-black text-zinc-500 uppercase tracking-widest">
+                              <span>Buyer: {Array.isArray(order.buyer) ? order.buyer[0]?.username : order.buyer?.username}</span>
+                              <span className="hidden sm:inline w-1 h-1 rounded-full bg-zinc-800" />
+                              <span>{new Date(order.created_at).toLocaleDateString()}</span>
                             </div>
                           </div>
-                          <div className="flex flex-wrap items-center gap-2 md:gap-3 text-[9px] md:text-[10px] font-black text-zinc-500 uppercase tracking-widest">
-                            <span>Buyer: {order.buyer.username}</span>
-                            <span className="hidden sm:inline w-1 h-1 rounded-full bg-zinc-800" />
-                            <span>{new Date(order.created_at).toLocaleDateString()}</span>
-                          </div>
-                        </div>
                       </div>
 
                       <div className="flex items-center justify-between md:justify-end gap-6 border-t border-white/5 pt-4 md:border-0 md:pt-0">
@@ -189,7 +252,7 @@ export default function SellerSalesPage() {
                         </div>
                         <div>
                           <h4 className="text-md font-black uppercase tracking-tighter text-zinc-300">
-                            {order.listing?.title || order.request?.title || 'Custom Order'}
+                            {Array.isArray(order.listing) ? order.listing[0]?.title : order.listing?.title || (Array.isArray(order.request) ? order.request[0]?.title : order.request?.title) || 'Custom Order'}
                           </h4>
                           <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mt-1">
                             Completed on {new Date(order.created_at).toLocaleDateString()}

@@ -33,11 +33,11 @@ export function ListingCard({ listing, index = 0 }: ListingCardProps) {
               referrerPolicy="no-referrer"
             />
             <div className="absolute top-4 left-4 flex flex-col gap-2">
-              <div className="bg-zinc-950/80 backdrop-blur-md px-3 py-1 rounded-lg border border-white/5 text-[9px] font-black uppercase tracking-widest text-amber-500 w-fit">
+              <div className="bg-zinc-950/80 px-3 py-1 rounded-lg border border-white/5 text-[9px] font-black uppercase tracking-widest text-amber-500 w-fit">
                 {listing.gameId}
               </div>
               {listing.seller?.isVerified && (
-                <div className="bg-emerald-500/90 backdrop-blur-md px-2 py-1 rounded-lg border border-emerald-400/20 text-[7px] font-black uppercase tracking-widest text-white flex items-center gap-1 w-fit">
+                <div className="bg-emerald-500/90 px-2 py-1 rounded-lg border border-emerald-400/20 text-[7px] font-black uppercase tracking-widest text-white flex items-center gap-1 w-fit">
                   <ShieldCheck className="w-2.5 h-2.5" />
                   Verified
                 </div>
