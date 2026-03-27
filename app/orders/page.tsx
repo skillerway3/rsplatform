@@ -9,7 +9,6 @@ import {
   Clock, 
   ShieldCheck, 
   ArrowRight, 
-  ExternalLink,
   Zap,
   CheckCircle2,
   AlertCircle,
@@ -19,7 +18,6 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { motion } from 'motion/react';
-import Image from 'next/image';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -38,8 +36,11 @@ const STATUS_CONFIG = {
 export default function OrdersPage() {
   const { user, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = React.useState('orders');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [orders, setOrders] = React.useState<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [sellingOrders, setSellingOrders] = React.useState<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [requests, setRequests] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
 
@@ -52,28 +53,28 @@ export default function OrdersPage() {
         // Fetch orders where user is buyer
         const { data: ordersData } = await supabase
           .from('orders')
-          .select('*, listings(*)')
+          .select('id, total_price, status, created_at, listing_id, listings(id, title)')
           .eq('buyer_id', user.id)
           .order('created_at', { ascending: false });
 
         // Fetch orders where user is seller
         const { data: sellingData } = await supabase
           .from('orders')
-          .select('*, listings(*)')
+          .select('id, total_price, status, created_at, listing_id, listings(id, title)')
           .eq('seller_id', user.id)
           .order('created_at', { ascending: false });
 
         // Fetch user's buyer requests
         const { data: requestsData } = await supabase
           .from('buyer_requests')
-          .select('*')
+          .select('id, title, status, created_at')
           .eq('buyer_id', user.id)
           .order('created_at', { ascending: false });
 
         setOrders(ordersData || []);
         setSellingOrders(sellingData || []);
         setRequests(requestsData || []);
-      } catch (err) {
+      } catch (err: unknown) {
         console.error('Error fetching orders/requests:', err);
       } finally {
         setLoading(false);
@@ -106,8 +107,7 @@ export default function OrdersPage() {
     <div className="pt-32 pb-32 bg-zinc-950 min-h-screen relative overflow-hidden">
       {/* Background Glows */}
       <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-amber-500/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-zinc-100/5 rounded-full blur-[120px]" />
+
       </div>
 
       <div className="container mx-auto px-6 relative z-10">
@@ -196,17 +196,7 @@ export default function OrdersPage() {
                           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
                             <div className="flex items-start space-x-8">
                               <div className="w-20 h-20 rounded-2xl bg-zinc-900 flex items-center justify-center overflow-hidden border border-white/5 shrink-0 relative">
-                                {order.listings?.images?.[0] ? (
-                                  <Image 
-                                    src={order.listings.images[0]} 
-                                    alt="Asset" 
-                                    fill
-                                    className="object-cover"
-                                    referrerPolicy="no-referrer"
-                                  />
-                                ) : (
-                                  <Package className="w-8 h-8 text-zinc-800" />
-                                )}
+                                <Package className="w-8 h-8 text-zinc-800" />
                               </div>
                               <div className="space-y-3">
                                 <div className="flex items-center space-x-3">
@@ -286,17 +276,7 @@ export default function OrdersPage() {
                           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
                             <div className="flex items-start space-x-8">
                               <div className="w-20 h-20 rounded-2xl bg-zinc-900 flex items-center justify-center overflow-hidden border border-white/5 shrink-0 relative">
-                                {order.listings?.images?.[0] ? (
-                                  <Image 
-                                    src={order.listings.images[0]} 
-                                    alt="Asset" 
-                                    fill
-                                    className="object-cover"
-                                    referrerPolicy="no-referrer"
-                                  />
-                                ) : (
-                                  <Package className="w-8 h-8 text-zinc-800" />
-                                )}
+                                <Package className="w-8 h-8 text-zinc-800" />
                               </div>
                               <div className="space-y-3">
                                 <div className="flex items-center space-x-3">

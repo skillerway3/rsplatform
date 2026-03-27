@@ -13,7 +13,6 @@ import {
   TrendingUp,
   Clock,
   CheckCircle2,
-  AlertCircle,
   CreditCard,
   DollarSign,
   X
@@ -31,18 +30,17 @@ interface Transaction {
   amount: number;
   type: string;
   status: string;
-  description: string;
+  description?: string;
   created_at: string;
 }
 
 export default function WalletPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [profile, setProfile] = React.useState<any>(null);
+  const [profile, setProfile] = React.useState<{ balance: number; total_earned: number } | null>(null);
   const [transactions, setTransactions] = React.useState<Transaction[]>([]);
   const [totalEarned, setTotalEarned] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
   const [showDepositModal, setShowDepositModal] = React.useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = React.useState(false);
   const [amount, setAmount] = React.useState('10');
@@ -51,38 +49,29 @@ export default function WalletPage() {
   const [withdrawDetails, setWithdrawDetails] = React.useState('');
   const [submitting, setSubmitting] = React.useState(false);
 
-  const fetchData = async () => {
+  const fetchData = React.useCallback(async () => {
     try {
       setLoading(true);
-      // Fetch profile for balance
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('balance, total_earned')
-        .eq('id', user!.id)
-        .single();
+      const [
+        { data: profileData, error: profileError },
+        { data: transData, error: transError }
+      ] = await Promise.all([
+        supabase.from('profiles').select('balance, total_earned').eq('id', user!.id).single(),
+        supabase.from('wallet_transactions').select('id, type, amount, status, created_at, reference_id, metadata').eq('user_id', user!.id).order('created_at', { ascending: false }).limit(10)
+      ]);
 
       if (profileError) throw profileError;
+      if (transError) throw transError;
       setProfile(profileData);
       setTotalEarned(profileData.total_earned || 0);
-
-      // Fetch recent transactions
-      const { data: transData, error: transError } = await supabase
-        .from('wallet_transactions')
-        .select('*')
-        .eq('user_id', user!.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (transError) throw transError;
       setTransactions(transData || []);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching wallet data:', err);
-      setError('Failed to load wallet information');
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   React.useEffect(() => {
     if (authLoading) return;
@@ -92,7 +81,7 @@ export default function WalletPage() {
     }
 
     fetchData();
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, fetchData]);
 
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,9 +118,9 @@ export default function WalletPage() {
       setWithdrawAmount('');
       setWithdrawDetails('');
       fetchData();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Withdrawal error:', err);
-      alert(err.message || 'Failed to submit withdrawal request');
+      alert(err instanceof Error ? err.message : 'Failed to submit withdrawal request');
     } finally {
       setSubmitting(false);
     }
@@ -149,8 +138,7 @@ export default function WalletPage() {
     <div className="pt-32 pb-32 bg-zinc-950 min-h-screen relative overflow-hidden">
       {/* Background Glows */}
       <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-amber-500/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-zinc-100/5 rounded-full blur-[120px]" />
+
       </div>
 
       <div className="container mx-auto px-6 relative z-10">
@@ -325,7 +313,7 @@ export default function WalletPage() {
       {/* Deposit Modal */}
       {showDepositModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-          <div className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm" onClick={() => setShowDepositModal(false)} />
+          <div className="absolute inset-0 bg-zinc-950/90" onClick={() => setShowDepositModal(false)} />
           <Card className="relative z-10 w-full max-w-md premium-card p-10">
             <div className="flex items-center justify-between mb-8">
               <h3 className="text-2xl font-black text-white uppercase tracking-tight">Add Funds</h3>
@@ -387,7 +375,7 @@ export default function WalletPage() {
       {/* Withdraw Modal */}
       {showWithdrawModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-          <div className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm" onClick={() => setShowWithdrawModal(false)} />
+          <div className="absolute inset-0 bg-zinc-950/90" onClick={() => setShowWithdrawModal(false)} />
           <Card className="relative z-10 w-full max-w-md premium-card p-10">
             <div className="flex items-center justify-between mb-8">
               <h3 className="text-2xl font-black text-white uppercase tracking-tight">Withdraw Funds</h3>

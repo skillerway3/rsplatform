@@ -21,7 +21,6 @@ import {
   MessageSquare,
   Wallet,
   HelpCircle,
-  History,
   FileText,
   DollarSign
 } from 'lucide-react';
@@ -64,8 +63,8 @@ export default function ProfilePage() {
     }
 
     // Use authProfile if available, otherwise fetch once
-    if (authProfile) {
-      setProfile(authProfile as Profile);
+    if (authProfile && authProfile.id === user.id) {
+      setProfile(authProfile as unknown as Profile);
       setUsername(authProfile.username || '');
       setLoading(false);
     } else {
@@ -76,14 +75,14 @@ export default function ProfilePage() {
           
           const { data, error } = await supabase
             .from('profiles')
-            .select('id, username, avatar_url, is_verified_seller, is_trusted_seller, created_at, role')
+            .select('id, username, avatar_url, is_verified_seller, is_trusted_seller, created_at, role, username_updated_at')
             .eq('id', user.id)
             .single();
 
           if (error) throw error;
           setProfile(data as Profile);
           setUsername(data?.username || '');
-        } catch (err: any) {
+        } catch (err: unknown) {
           console.error('Error fetching profile:', err);
           setError('Failed to load profile');
         } finally {
@@ -103,7 +102,7 @@ export default function ProfilePage() {
     setSuccess(false);
 
     try {
-      const updateData: any = { username };
+      const updateData = { username };
       
       const { error } = await supabase
         .from('profiles')
@@ -113,10 +112,10 @@ export default function ProfilePage() {
       if (error) throw error;
       setSuccess(true);
       setProfile(prev => prev ? ({ ...prev, username }) : null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error updating profile:', err);
       // Handle the specific error from the trigger
-      const message = err.message || 'Failed to update profile. Username might be taken.';
+      const message = err instanceof Error ? err.message : 'Failed to update profile. Username might be taken.';
       setError(message.includes('30 days') ? message : 'Failed to update profile. Username might be taken.');
     } finally {
       setUpdating(false);
@@ -177,9 +176,9 @@ export default function ProfilePage() {
       
       // Force refresh
       router.refresh();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error uploading avatar:', err);
-      setError('Failed to upload avatar: ' + (err.message || 'Unknown error'));
+      setError('Failed to upload avatar: ' + (err instanceof Error ? err.message : 'Unknown error'));
     } finally {
       setUploading(false);
     }
@@ -215,7 +214,7 @@ export default function ProfilePage() {
     <div className="pt-32 pb-32 bg-zinc-950 min-h-screen relative overflow-hidden">
       {/* Background Glows - Simplified for performance */}
       <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-[-5%] left-[-5%] w-[20%] h-[20%] bg-amber-500/5 rounded-full blur-[60px]" />
+        <div className="absolute top-[-10%] left-[-10%] w-[30%] h-[30%] bg-amber-500/5 rounded-full blur-[80px]" />
       </div>
 
       <div className="container mx-auto px-6 relative z-10">

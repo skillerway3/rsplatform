@@ -23,6 +23,25 @@ interface Request {
   buyer_id: string;
 }
 
+interface Order {
+  id: string;
+  status: string;
+  total_price: number;
+  created_at: string;
+  buyer_id: string;
+  seller_id: string;
+  listing_id?: string;
+  request_id?: string;
+}
+
+interface Proof {
+  id: string;
+  file_url: string;
+  note?: string;
+  created_at: string;
+  signed_url?: string;
+}
+
 export default function SellerRequestPage() {
   const { id } = useParams();
   const { user, isVerifiedSeller, loading: authLoading } = useAuth();
@@ -37,8 +56,8 @@ export default function SellerRequestPage() {
   const [hasSubmittedOffer, setHasSubmittedOffer] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
 
-  const [order, setOrder] = useState<any>(null);
-  const [proof, setProof] = useState<any>(null);
+  const [order, setOrder] = useState<Order | null>(null);
+  const [proof, setProof] = useState<Proof | null>(null);
   const [deliveryFile, setDeliveryFile] = useState<File | null>(null);
   const [deliveryNote, setDeliveryNote] = useState('');
 
@@ -53,7 +72,7 @@ export default function SellerRequestPage() {
       try {
         const { data: reqData, error: reqError } = await supabase
           .from('buyer_requests')
-          .select('*')
+          .select('id, title, description, category, game, status, created_at, expires_at, buyer_id, budget_min, budget_max')
           .eq('id', id)
           .single();
 
@@ -61,7 +80,7 @@ export default function SellerRequestPage() {
         setRequest(reqData);
 
         // Check if seller already submitted an offer
-        const { data: offerData, error: offerError } = await supabase
+        const { data: offerData } = await supabase
           .from('buyer_request_offers')
           .select('id, status')
           .eq('request_id', id)
@@ -75,18 +94,18 @@ export default function SellerRequestPage() {
           if (offerData.status === 'accepted') {
             const { data: orderData } = await supabase
               .from('orders')
-              .select('*')
+              .select('id, status, total_price, created_at')
               .eq('request_id', id)
               .eq('seller_id', user.id)
               .maybeSingle();
             
-            setOrder(orderData);
+            setOrder(orderData as Order);
 
             // Fetch proof if delivered or completed
             if (orderData?.status === 'delivered' || orderData?.status === 'completed') {
               const { data: proofData } = await supabase
                 .from('buyer_request_proofs')
-                .select('*')
+                .select('id, file_url, note, created_at')
                 .eq('order_id', orderData.id)
                 .maybeSingle();
               
@@ -99,7 +118,7 @@ export default function SellerRequestPage() {
                     .createSignedUrl(`proofs/${orderData.id}/${filePath}`, 3600);
                   
                   if (signedData) {
-                    proofData.signed_url = signedData.signedUrl;
+                    (proofData as Proof).signed_url = signedData.signedUrl;
                   }
                 }
                 setProof(proofData);
@@ -107,9 +126,9 @@ export default function SellerRequestPage() {
             }
           }
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error fetching request:', err);
-        setError(err.message);
+        setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
         setLoading(false);
       }
@@ -189,22 +208,22 @@ export default function SellerRequestPage() {
       setLoading(true);
       const { data: reqData } = await supabase
         .from('buyer_requests')
-        .select('*')
+        .select('id, title, description, budget_min, budget_max, status, created_at, expires_at, buyer_id, game, category')
         .eq('id', id)
         .single();
       if (reqData) setRequest(reqData);
 
       const { data: orderData } = await supabase
         .from('orders')
-        .select('*')
+        .select('id, buyer_id, seller_id, listing_id, request_id, total_price, status, created_at, updated_at')
         .eq('request_id', id)
         .eq('seller_id', user.id)
         .maybeSingle();
       if (orderData) {
-        setOrder(orderData);
+        setOrder(orderData as Order);
         const { data: proofData } = await supabase
           .from('buyer_request_proofs')
-          .select('*')
+          .select('id, order_id, file_url, note, created_at')
           .eq('order_id', orderData.id)
           .maybeSingle();
         if (proofData) {
@@ -213,13 +232,13 @@ export default function SellerRequestPage() {
             const { data: signedData } = await supabase.storage
               .from('verifications')
               .createSignedUrl(`proofs/${orderData.id}/${filePath}`, 3600);
-            if (signedData) proofData.signed_url = signedData.signedUrl;
+            if (signedData) (proofData as Proof).signed_url = signedData.signedUrl;
           }
           setProof(proofData);
         }
       }
       setLoading(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error delivering service:', err);
       setError('Failed to deliver service. Please try again.');
     } finally {
@@ -267,7 +286,7 @@ export default function SellerRequestPage() {
 
       console.log('Offer submitted successfully');
       setHasSubmittedOffer(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error submitting offer:', err);
       setError('Failed to submit offer. Please try again.');
     } finally {

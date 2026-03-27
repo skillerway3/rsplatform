@@ -27,7 +27,7 @@ type Conversation = {
 async function markConversationReadLite(convo: Conversation, userId: string) {
   if (!convo.last_message_at) return;
 
-  const patch: any = {};
+  const patch: Partial<Conversation> = {};
   if (convo.buyer_id === userId) patch.buyer_last_read_at = new Date().toISOString();
   if (convo.seller_id === userId) patch.seller_last_read_at = new Date().toISOString();
 
@@ -51,7 +51,7 @@ export default function ChatPage() {
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   // ✅ throttle read updates (prevents spam on mobile)
-  const readTimerRef = useRef<any>(null);
+  const readTimerRef = useRef<NodeJS.Timeout | null>(null);
   const scheduleMarkRead = (c: Conversation, uid: string) => {
     if (readTimerRef.current) return;
     readTimerRef.current = setTimeout(async () => {
@@ -201,7 +201,7 @@ export default function ChatPage() {
 
     // Add instantly (realtime will also deliver it, dedupe by id)
     setMessages((prev) => {
-      if (prev.some((m) => m.id === (inserted as any).id)) return prev;
+      if (prev.some((m) => m.id === (inserted as Message).id)) return prev;
       const next = [...prev, inserted as Message];
       if (next.length > 120) next.splice(0, next.length - 120);
       return next;
@@ -211,7 +211,7 @@ export default function ChatPage() {
     const { error: upErr } = await supabase
       .from("conversations")
       .update({
-        last_message_at: (inserted as any).created_at,
+        last_message_at: (inserted as Message).created_at,
         last_message_by: userId!,
 
       })
@@ -225,7 +225,7 @@ export default function ChatPage() {
   const uid = userId;
   const updated: Conversation = {
     ...prev,
-    last_message_at: (inserted as any).created_at,
+    last_message_at: (inserted as Message).created_at,
     last_message_by: uid,
   };
 

@@ -3,20 +3,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Clock, 
-  DollarSign, 
-  ChevronRight, 
-  ShieldCheck, 
   AlertCircle,
   CheckCircle2,
   XCircle,
-  MessageSquare,
-  Zap,
   Loader2,
   Package,
-  ExternalLink,
   ArrowRight,
   ShoppingBag
 } from 'lucide-react';
@@ -30,33 +22,24 @@ interface Order {
   total_price: number;
   status: string;
   created_at: string;
+  seller_id: string;
+  listing_id: string | null;
+  request_id: string | null;
   seller: {
     username: string;
     avatar_url: string;
-  } | {
-    username: string;
-    avatar_url: string;
-  }[];
+  };
   listing?: {
     id: string;
     title: string;
     category: string;
     images: string[];
-  } | {
-    id: string;
-    title: string;
-    category: string;
-    images: string[];
-  }[];
+  };
   request?: {
     id: string;
     title: string;
     category: string;
-  } | {
-    id: string;
-    title: string;
-    category: string;
-  }[];
+  };
 }
 
 export default function BuyerOrdersPage() {
@@ -73,7 +56,7 @@ export default function BuyerOrdersPage() {
       // Simplified query: Fetch orders first, then related data to avoid complex joins
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
-        .select('id, total_price, status, created_at, seller_id, listing_id, buyer_request_id')
+        .select('id, total_price, status, created_at, seller_id, listing_id, request_id')
         .eq('buyer_id', user.id)
         .order('created_at', { ascending: false });
 
@@ -86,34 +69,32 @@ export default function BuyerOrdersPage() {
       // Fetch related data in parallel
       const sellerIds = Array.from(new Set(ordersData.map(o => o.seller_id).filter(Boolean)));
       const listingIds = Array.from(new Set(ordersData.map(o => o.listing_id).filter(Boolean)));
-      const requestIds = Array.from(new Set(ordersData.map(o => o.buyer_request_id).filter(Boolean)));
 
       const [
         { data: sellers },
-        { data: listings },
-        { data: requests }
+        { data: listings }
       ] = await Promise.all([
         supabase.from('profiles').select('id, username, avatar_url').in('id', sellerIds),
-        supabase.from('listings').select('id, title, category, images').in('id', listingIds),
-        supabase.from('buyer_requests').select('id, title, category').in('id', requestIds)
+        supabase.from('listings').select('id, title, category, images').in('id', listingIds)
       ]);
 
       // Map related data back to orders
       const enrichedOrders = ordersData.map(order => ({
         ...order,
+        request_id: order.request_id || null,
         seller: sellers?.find(s => s.id === order.seller_id) || { username: 'Unknown', avatar_url: '' },
-        listing: listings?.find(l => l.id === order.listing_id),
-        request: requests?.find(r => r.id === order.buyer_request_id)
+        listing: listings?.find(l => l.id === order.listing_id)
       }));
 
-      setOrders(enrichedOrders as any);
-    } catch (err: any) {
+      setOrders(enrichedOrders as Order[]);
+    } catch (err: unknown) {
       console.error('Error fetching orders:', err);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : 'Failed to fetch orders');
     } finally {
       setLoading(false);
     }
   }, [user]);
+
 
   useEffect(() => {
     if (authLoading) return;

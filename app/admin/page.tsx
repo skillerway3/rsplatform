@@ -13,7 +13,6 @@ import {
   UserCheck,
   ChevronRight,
   ArrowUpRight,
-  ArrowDownRight,
   Clock,
   Activity,
   Flag,
@@ -24,6 +23,21 @@ import { createClient } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+
+interface RecentTransaction {
+  id: string;
+  order_code?: string;
+  type: string;
+  amount: number;
+  created_at: string;
+}
+
+interface RecentActivity {
+  id: string;
+  action: string;
+  entity_type: string;
+  created_at: string;
+}
 
 interface DashboardStats {
   totalUsers: number;
@@ -39,8 +53,8 @@ interface DashboardStats {
   userReports: number;
   platformIssues: number;
   platformRevenue: number;
-  recentTransactions: any[];
-  recentActivity: any[];
+  recentTransactions: RecentTransaction[];
+  recentActivity: RecentActivity[];
 }
 
 export default function AdminDashboardPage() {
@@ -68,24 +82,24 @@ export default function AdminDashboardPage() {
           { data: transactions },
           { data: activity }
         ] = await Promise.all([
-          supabase.from('profiles').select('*', { count: 'exact', head: true }),
-          supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('is_verified_seller', true),
-          supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('is_trusted_seller', true),
-          supabase.from('listings').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-          supabase.from('buyer_requests').select('*', { count: 'exact', head: true }).eq('status', 'open'),
-          supabase.from('orders').select('*', { count: 'exact', head: true }).in('status', ['pending', 'processing', 'delivered']),
-          supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
-          supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'disputed'),
-          supabase.from('seller_verifications').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-          supabase.from('support_threads').select('*', { count: 'exact', head: true }).eq('status', 'open'),
-          supabase.from('user_reports').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-          supabase.from('platform_reports').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-          supabase.from('orders').select('platform_fee').eq('status', 'completed'),
-          supabase.from('transaction_logs').select('*').order('created_at', { ascending: false }).limit(5),
-          supabase.from('admin_activity_logs').select('*').order('created_at', { ascending: false }).limit(5)
+          supabase.from('profiles').select('id', { count: 'exact', head: true }),
+          supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('is_verified_seller', true),
+          supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('is_trusted_seller', true),
+          supabase.from('listings').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+          supabase.from('buyer_requests').select('id', { count: 'exact', head: true }).eq('status', 'open'),
+          supabase.from('orders').select('id', { count: 'exact', head: true }).in('status', ['pending', 'processing', 'delivered']),
+          supabase.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'completed'),
+          supabase.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'disputed'),
+          supabase.from('seller_verifications').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+          supabase.from('support_threads').select('id', { count: 'exact', head: true }).eq('status', 'open'),
+          supabase.from('user_reports').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+          supabase.from('platform_reports').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+          supabase.from('orders').select('total_price').eq('status', 'completed'),
+          supabase.from('transaction_logs').select('id, amount, type, status, created_at').order('created_at', { ascending: false }).limit(5),
+          supabase.from('admin_activity_logs').select('id, action, entity_type, created_at, admin_id').order('created_at', { ascending: false }).limit(5)
         ]);
 
-        const totalRevenue = revenueData?.reduce((acc, curr) => acc + (Number(curr.platform_fee) || 0), 0) || 0;
+        const totalRevenue = revenueData?.reduce((acc, curr) => acc + (Number(curr.total_price) * 0.1 || 0), 0) || 0;
 
         setStats({
           totalUsers: usersCount || 0,
@@ -101,10 +115,10 @@ export default function AdminDashboardPage() {
           userReports: userReportsCount || 0,
           platformIssues: platformIssuesCount || 0,
           platformRevenue: totalRevenue,
-          recentTransactions: transactions || [],
-          recentActivity: activity || []
+          recentTransactions: (transactions as RecentTransaction[]) || [],
+          recentActivity: (activity as RecentActivity[]) || []
         });
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Error fetching dashboard stats:', error);
       } finally {
         setLoading(false);
@@ -112,7 +126,7 @@ export default function AdminDashboardPage() {
     }
 
     fetchStats();
-  }, []);
+  }, [supabase]);
 
   if (loading) {
     return (
@@ -198,7 +212,7 @@ export default function AdminDashboardPage() {
                     </div>
                     <div>
                       <p className="text-[10px] font-black text-white uppercase tracking-widest mb-0.5">{tx.order_code || 'Order Log'}</p>
-                      <p className="text-[9px] font-medium text-zinc-500 uppercase tracking-widest">{tx.action_type.replace(/_/g, ' ')}</p>
+                      <p className="text-[9px] font-medium text-zinc-500 uppercase tracking-widest">{tx.type.replace(/_/g, ' ')}</p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -237,8 +251,8 @@ export default function AdminDashboardPage() {
                       <ShieldCheck className="w-4 h-4 text-zinc-500" />
                     </div>
                     <div>
-                      <p className="text-[10px] font-black text-white uppercase tracking-widest mb-0.5">{log.action_type.replace(/_/g, ' ')}</p>
-                      <p className="text-[9px] font-medium text-zinc-500 uppercase tracking-widest">Target: {log.target_type}</p>
+                      <p className="text-[10px] font-black text-white uppercase tracking-widest mb-0.5">{log.action.replace(/_/g, ' ')}</p>
+                      <p className="text-[9px] font-medium text-zinc-500 uppercase tracking-widest">Target: {log.entity_type}</p>
                     </div>
                   </div>
                   <div className="text-right">

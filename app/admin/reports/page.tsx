@@ -4,19 +4,10 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Flag, 
-  ShieldAlert, 
-  User, 
-  CheckCircle2, 
-  XCircle, 
   Loader2, 
   ArrowLeft,
   Search,
-  Filter,
-  Eye,
-  MoreVertical,
-  AlertTriangle,
-  ExternalLink,
-  MessageSquare
+  ExternalLink
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -35,8 +26,8 @@ interface UserReport {
   evidence_urls: string[];
   status: string;
   created_at: string;
-  reporter: { username: string; email: string };
-  reported_user: { username: string; email: string };
+  reporter: { username: string };
+  reported_user: { username: string };
 }
 
 export default function AdminReportsPage() {
@@ -60,14 +51,14 @@ export default function AdminReportsPage() {
           .from('user_reports')
           .select(`
             *,
-            reporter:reporter_id(username, email),
-            reported_user:reported_user_id(username, email)
+            reporter:reporter_id(username),
+            reported_user:reported_user_id(username)
           `)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
         setReports(data || []);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error fetching reports:', err);
       } finally {
         setLoading(false);
@@ -90,7 +81,7 @@ export default function AdminReportsPage() {
 
       if (error) throw error;
       setReports(prev => prev.map(r => r.id === reportId ? { ...r, status: newStatus } : r));
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error updating report status:', err);
       alert('Failed to update status');
     }
@@ -117,8 +108,6 @@ export default function AdminReportsPage() {
     <div className="pt-32 pb-32 bg-zinc-950 min-h-screen relative overflow-hidden">
       {/* Background Glows */}
       <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-amber-500/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-zinc-100/5 rounded-full blur-[120px]" />
       </div>
 
       <div className="container mx-auto px-6 relative z-10">

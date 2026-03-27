@@ -1,38 +1,43 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Wallet, 
   CheckCircle, 
   XCircle, 
-  Clock, 
   Search, 
-  Filter, 
   ArrowLeft,
   User,
-  ExternalLink,
   Loader2,
   AlertCircle
 } from "lucide-react";
 import Link from "next/link";
 
+interface Withdrawal {
+  id: string;
+  user_id: string;
+  amount: number;
+  type: string;
+  status: string;
+  created_at: string;
+  processed_at: string | null;
+  admin_notes: string | null;
+  profiles?: { id: string; full_name: string | null; username: string } | null;
+}
+
 export default function AdminWithdrawalsPage() {
-  const supabase = createClient();
-  const [withdrawals, setWithdrawals] = useState<any[]>([]);
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [filter, setFilter] = useState("pending");
   const [search, setSearch] = useState("");
-  const [selectedTx, setSelectedTx] = useState<any | null>(null);
+  const [selectedTx, setSelectedTx] = useState<Withdrawal | null>(null);
   const [adminNotes, setAdminNotes] = useState("");
 
-  useEffect(() => {
-    fetchWithdrawals();
-  }, [filter]);
-
-  async function fetchWithdrawals() {
+  const fetchWithdrawals = useCallback(async () => {
+    const supabase = createClient();
     setLoading(true);
     try {
       let query = supabase
@@ -59,10 +64,10 @@ export default function AdminWithdrawalsPage() {
         const profileMap = (profilesData || []).reduce((acc, p) => {
           acc[p.id] = p;
           return acc;
-        }, {} as Record<string, any>);
+        }, {} as Record<string, { id: string; full_name: string | null; username: string }>);
 
         // Map profiles back to transactions
-        const enrichedTx = txData.map(tx => ({
+        const enrichedTx: Withdrawal[] = txData.map(tx => ({
           ...tx,
           profiles: profileMap[tx.user_id] || null
         }));
@@ -71,12 +76,16 @@ export default function AdminWithdrawalsPage() {
       } else {
         setWithdrawals([]);
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Error fetching withdrawals:", err);
     } finally {
       setLoading(false);
     }
-  }
+  }, [filter]);
+
+  useEffect(() => {
+    fetchWithdrawals();
+  }, [fetchWithdrawals]);
 
   async function handleProcess(id: string, action: "approve" | "reject") {
     if (!adminNotes && action === "reject") {
@@ -101,7 +110,7 @@ export default function AdminWithdrawalsPage() {
       } else {
         alert(result.error || "Failed to process withdrawal");
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Error processing withdrawal:", err);
     } finally {
       setProcessingId(null);
@@ -109,7 +118,7 @@ export default function AdminWithdrawalsPage() {
   }
 
   const filteredWithdrawals = withdrawals.filter(tx => {
-    const profile = Array.isArray(tx.profiles) ? tx.profiles[0] : tx.profiles;
+    const profile = tx.profiles;
     return profile?.username?.toLowerCase().includes(search.toLowerCase()) ||
            profile?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
            tx.id.includes(search);
@@ -313,7 +322,7 @@ export default function AdminWithdrawalsPage() {
                       </div>
                       <div className="bg-white/5 p-4 rounded-xl">
                         <div className="text-xs text-gray-500 uppercase font-bold mb-1">Admin Notes</div>
-                        <div className="text-sm italic text-gray-300">"{selectedTx.admin_notes || "No notes provided"}"</div>
+                        <div className="text-sm italic text-gray-300">&quot;{selectedTx.admin_notes || "No notes provided"}&quot;</div>
                       </div>
                     </div>
                   )}

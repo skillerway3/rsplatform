@@ -52,10 +52,11 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ success: true, data });
-  } catch (error: any) {
+  } catch (err: unknown) {
+    const error = err as Error;
     console.error('Support API error:', error);
     return NextResponse.json(
-      { error: error?.message || 'Unexpected server error' },
+      { error: error.message || 'Unexpected server error' },
       { status: 500 }
     );
   }

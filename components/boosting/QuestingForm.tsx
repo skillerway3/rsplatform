@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { Search, Check, X, Info, Upload, FileText } from 'lucide-react';
+import { Search, Check, Upload, FileText } from 'lucide-react';
 import { OSRS_QUESTS } from '@/data/boosting/osrs-quests';
 import { AccountTypeSelector } from './AccountTypeSelector';
 
@@ -96,7 +96,7 @@ export function QuestingForm({ onUpdate }: QuestingFormProps) {
           {filteredQuests.length > 0 ? (
             filteredQuests.map((group) => (
               <div key={group.category} className="space-y-4">
-                <div className="flex items-center gap-4 sticky top-0 bg-zinc-950/80 backdrop-blur-md py-2 z-20 -mx-2 px-2 rounded-lg">
+                <div className="flex items-center gap-4 sticky top-0 bg-zinc-950 py-2 z-20 -mx-2 px-2 rounded-lg">
                   <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] whitespace-nowrap">
                     {group.category}
                   </h4>

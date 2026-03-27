@@ -17,11 +17,7 @@ import {
   CheckCircle, 
   Wallet, 
   ArrowUpRight, 
-  ArrowDownLeft,
-  MoreVertical,
-  Clock,
-  ExternalLink,
-  DollarSign
+  ArrowDownLeft
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
@@ -31,18 +27,82 @@ import Image from 'next/image';
 import { cn, formatCurrency } from '@/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
+interface Profile {
+  id: string;
+  username: string;
+  avatar_url: string | null;
+  full_name: string | null;
+  is_suspended: boolean;
+  suspension_reason: string | null;
+  is_verified_seller: boolean;
+  is_trusted_seller: boolean;
+  manual_trusted_override: boolean;
+  role: string;
+  balance: number;
+  total_earned: number;
+  average_rating: number;
+  review_count: number;
+  created_at: string;
+  username_updated_at: string | null;
+  moderation_notes: string | null;
+}
+
+interface Review {
+  id: string;
+  seller_id: string;
+  buyer_id: string;
+  rating: number;
+  review_text: string;
+  created_at: string;
+}
+
+interface AdminLog {
+  id: string;
+  admin_id: string;
+  target_id: string;
+  target_type: string;
+  action_type: string;
+  old_value: unknown;
+  new_value: unknown;
+  created_at: string;
+  admin?: {
+    username: string;
+  };
+}
+
+interface Transaction {
+  id: string;
+  user_id: string;
+  type: string;
+  amount: number;
+  status: string;
+  created_at: string;
+}
+
+interface UserStats {
+  listingsCount: number;
+  ordersAsBuyerCount: number;
+  ordersAsSellerCount: number;
+  requestsCount: number;
+  offersCount: number;
+  reviews: Review[];
+  logs: AdminLog[];
+  transactions: Transaction[];
+}
+
 export default function AdminUserDetailPage() {
   const { id } = useParams();
   const router = useRouter();
-  const supabase = createClient();
-  const [user, setUser] = React.useState<any>(null);
-  const [stats, setStats] = React.useState<any>(null);
+  const [user, setUser] = React.useState<Profile | null>(null);
+  const [stats, setStats] = React.useState<UserStats | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [isUpdating, setIsUpdating] = React.useState(false);
   const [confirmAction, setConfirmAction] = React.useState<{ type: string; label: string } | null>(null);
 
   React.useEffect(() => {
+    const supabase = createClient();
     async function fetchUserDetail() {
+      if (!id) return;
       try {
         const [
           { data: profile, error: profileError },
@@ -55,20 +115,20 @@ export default function AdminUserDetailPage() {
           { data: logs },
           { data: transactions }
         ] = await Promise.all([
-          supabase.from('profiles').select('*').eq('id', id).single(),
-          supabase.from('listings').select('*', { count: 'exact', head: true }).eq('seller_id', id),
-          supabase.from('orders').select('*', { count: 'exact', head: true }).eq('buyer_id', id),
-          supabase.from('orders').select('*', { count: 'exact', head: true }).eq('seller_id', id),
-          supabase.from('buyer_requests').select('*', { count: 'exact', head: true }).eq('buyer_id', id),
-          supabase.from('buyer_request_offers').select('*', { count: 'exact', head: true }).eq('seller_id', id),
-          supabase.from('seller_reviews').select('*').eq('seller_id', id).order('created_at', { ascending: false }).limit(5),
+          supabase.from('profiles').select('id, username, full_name, avatar_url, is_verified_seller, is_trusted_seller, manual_trusted_override, average_rating, review_count, created_at, role').eq('id', id).single(),
+          supabase.from('listings').select('id', { count: 'exact', head: true }).eq('seller_id', id),
+          supabase.from('orders').select('id', { count: 'exact', head: true }).eq('buyer_id', id),
+          supabase.from('orders').select('id', { count: 'exact', head: true }).eq('seller_id', id),
+          supabase.from('buyer_requests').select('id', { count: 'exact', head: true }).eq('buyer_id', id),
+          supabase.from('buyer_request_offers').select('id', { count: 'exact', head: true }).eq('seller_id', id),
+          supabase.from('seller_reviews').select('id, seller_id, buyer_id, rating, review_text, created_at, order_id').eq('seller_id', id).order('created_at', { ascending: false }).limit(5),
           supabase.from('admin_activity_logs').select('*, admin:profiles!admin_activity_logs_admin_id_fkey(username)').eq('target_id', id).order('created_at', { ascending: false }).limit(10),
-          supabase.from('wallet_transactions').select('*').eq('user_id', id).order('created_at', { ascending: false }).limit(5)
+          supabase.from('wallet_transactions').select('id, user_id, amount, type, status, created_at').eq('user_id', id).order('created_at', { ascending: false }).limit(5)
         ]);
 
         if (profileError) throw profileError;
 
-        setUser(profile);
+        setUser(profile as Profile);
         setStats({
           listingsCount: listingsCount || 0,
           ordersAsBuyerCount: ordersAsBuyerCount || 0,
@@ -79,7 +139,7 @@ export default function AdminUserDetailPage() {
           logs: logs || [],
           transactions: transactions || []
         });
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Error fetching user detail:', error);
         router.push('/admin/users');
       } finally {
@@ -87,18 +147,21 @@ export default function AdminUserDetailPage() {
       }
     }
 
-    if (id) fetchUserDetail();
-  }, [id]);
+    fetchUserDetail();
+  }, [id, router]);
 
-  const handleUpdateStatus = async (updates: any) => {
+  const handleUpdateStatus = async (updates: Partial<Profile>) => {
+    if (!user) return;
+    const supabase = createClient();
     setIsUpdating(true);
     try {
       const { error } = await supabase.from('profiles').update(updates).eq('id', id);
       if (error) throw error;
       
       // Log the action
+      const { data: { user: adminUser } } = await supabase.auth.getUser();
       await supabase.from('admin_activity_logs').insert({
-        admin_id: (await supabase.auth.getUser()).data.user?.id,
+        admin_id: adminUser?.id,
         target_id: id,
         target_type: 'user',
         action_type: updates.is_suspended !== undefined ? (updates.is_suspended ? 'user_suspended' : 'user_unsuspended') : 'user_updated',
@@ -106,16 +169,16 @@ export default function AdminUserDetailPage() {
         new_value: { ...user, ...updates }
       });
 
-      setUser({ ...user, ...updates });
+      setUser({ ...user, ...updates } as Profile);
       setConfirmAction(null);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error updating user:', error);
     } finally {
       setIsUpdating(false);
     }
   };
 
-  if (loading) {
+  if (loading || !user || !stats) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
@@ -221,7 +284,7 @@ export default function AdminUserDetailPage() {
               </div>
               <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-4">Confirm Action</h3>
               <p className="text-zinc-400 text-sm font-medium leading-relaxed mb-8">
-                Are you sure you want to perform the action: <span className="text-white font-bold">"{confirmAction.label}"</span> on user <span className="text-white font-bold">{user.username}</span>? This action will be logged in the audit trail.
+                Are you sure you want to perform the action: <span className="text-white font-bold">&quot;{confirmAction.label}&quot;</span> on user <span className="text-white font-bold">{user.username}</span>? This action will be logged in the audit trail.
               </p>
               <div className="grid grid-cols-2 gap-4">
                 <Button variant="outline" className="rounded-2xl h-14" onClick={() => setConfirmAction(null)}>Cancel</Button>
@@ -332,7 +395,7 @@ export default function AdminUserDetailPage() {
                   <p className="text-[10px] text-zinc-500 italic">No recent transactions</p>
                 ) : (
                   <div className="space-y-3">
-                    {stats.transactions.map((tx: any) => (
+                    {stats.transactions.map((tx) => (
                       <div key={tx.id} className="flex items-center justify-between p-3 bg-zinc-950/50 rounded-xl border border-white/5">
                         <div className="flex items-center gap-3">
                           <div className={cn(
@@ -440,7 +503,7 @@ export default function AdminUserDetailPage() {
                   <p className="text-zinc-500 text-xs font-black uppercase tracking-widest">No administrative actions recorded.</p>
                 </div>
               ) : (
-                stats.logs.map((log: any) => (
+                stats.logs.map((log) => (
                   <div key={log.id} className="p-6 flex items-center justify-between hover:bg-white/5 transition-colors group">
                     <div className="flex items-center space-x-6">
                       <div className="w-12 h-12 bg-zinc-950 rounded-2xl flex items-center justify-center border border-white/5 group-hover:border-amber-500/20 transition-colors">

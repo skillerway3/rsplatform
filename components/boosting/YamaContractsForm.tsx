@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { Info, Upload, Check, FileText } from 'lucide-react';
+import { Upload, Check, FileText } from 'lucide-react';
 import { OSRS_YAMA_CONTRACTS } from '@/data/boosting/osrs-yama-contracts';
 import { AccountTypeSelector } from './AccountTypeSelector';
 

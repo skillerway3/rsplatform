@@ -8,10 +8,7 @@ import {
   Zap, 
   Star, 
   Calendar, 
-  MessageSquare, 
-  ShieldAlert, 
   Loader2, 
-  ArrowLeft,
   CheckCircle2,
   AlertCircle,
   Flag,
@@ -19,7 +16,6 @@ import {
   Clock,
   Upload,
   X,
-  FileText,
   Image as ImageIcon,
   Film
 } from 'lucide-react';
@@ -76,7 +72,7 @@ export default function PublicProfilePage() {
         // Fetch profile
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('*')
+          .select('id, username, avatar_url, is_verified_seller, is_trusted_seller, created_at, average_rating, review_count')
           .eq('id', id)
           .single();
 
@@ -86,14 +82,14 @@ export default function PublicProfilePage() {
         // Fetch active listings
         const { data: listingsData, error: listingsError } = await supabase
           .from('listings')
-          .select('*')
+          .select('id, title, price, game, category, images, created_at')
           .eq('seller_id', id)
           .eq('status', 'active')
           .order('created_at', { ascending: false });
 
         if (listingsError) throw listingsError;
         setListings(listingsData || []);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error fetching public profile:', err);
         setError('User not found');
       } finally {
@@ -146,7 +142,7 @@ export default function PublicProfilePage() {
 
       if (createErr) throw createErr;
       router.push(`/chat/${created.id}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error starting chat:', err);
       alert('Failed to start conversation');
     } finally {
@@ -200,7 +196,7 @@ export default function PublicProfilePage() {
         setReportDetails('');
         setEvidenceFiles([]);
       }, 3000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error submitting report:', err);
       alert('Failed to submit report');
     } finally {
@@ -230,8 +226,7 @@ export default function PublicProfilePage() {
     <div className="pt-32 pb-32 bg-zinc-950 min-h-screen relative overflow-hidden">
       {/* Background Glows */}
       <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-amber-500/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-zinc-100/5 rounded-full blur-[120px]" />
+
       </div>
 
       <div className="container mx-auto px-6 relative z-10">
@@ -363,7 +358,7 @@ export default function PublicProfilePage() {
                               <Tag className="w-12 h-12 text-zinc-800" />
                             </div>
                           )}
-                          <div className="absolute top-4 left-4 px-3 py-1 bg-zinc-950/80 backdrop-blur-md rounded-lg border border-white/5 text-[9px] font-black text-white uppercase tracking-widest">
+                          <div className="absolute top-4 left-4 px-3 py-1 bg-zinc-950/90 rounded-lg border border-white/5 text-[9px] font-black text-white uppercase tracking-widest">
                             {listing.game}
                           </div>
                         </div>
@@ -399,7 +394,7 @@ export default function PublicProfilePage() {
       {/* Report Modal */}
       {showReportModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-          <div className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm" onClick={() => setShowReportModal(false)} />
+          <div className="absolute inset-0 bg-zinc-950/90" onClick={() => setShowReportModal(false)} />
           <Card className="relative z-10 w-full max-w-lg premium-card p-10">
             {reportSuccess ? (
               <div className="text-center py-8">

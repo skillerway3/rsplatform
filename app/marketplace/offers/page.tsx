@@ -3,18 +3,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { 
   Search, 
   Filter, 
   Clock, 
-  DollarSign, 
   ChevronRight, 
-  ShieldCheck, 
-  AlertCircle,
-  CheckCircle2,
-  XCircle,
-  Send
+  AlertCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
@@ -41,7 +36,7 @@ export default function SellerOffersPage() {
   const { user } = useAuth();
   const [requests, setRequests] = useState<BuyerRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [isVerified, setIsVerified] = useState(false);
@@ -61,25 +56,48 @@ export default function SellerOffersPage() {
       setLoading(true);
       const { data, error } = await supabase
         .from('buyer_requests')
-        .select(`
-          *,
-          buyer:profiles!buyer_id(username, avatar_url),
-          offers:buyer_request_offers(count)
-        `)
+        .select('*, buyer_id')
         .eq('status', 'open')
         .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      
-      const formattedData = data.map((req: any) => ({
+      if (!data || data.length === 0) {
+        setRequests([]);
+        return;
+      }
+
+      // Fetch related data in parallel to avoid heavy nested queries
+      const buyerIds = Array.from(new Set(data.map(r => r.buyer_id).filter(Boolean)));
+      const requestIds = data.map(r => r.id);
+
+      const [
+        { data: profiles },
+        { data: offerCounts }
+      ] = await Promise.all([
+        supabase.from('profiles').select('id, username, avatar_url').in('id', buyerIds),
+        supabase.from('buyer_request_offers').select('request_id').in('request_id', requestIds)
+      ]);
+
+      const profileMap = (profiles || []).reduce((acc, p) => {
+        acc[p.id] = p;
+        return acc;
+      }, {} as Record<string, { id: string; username: string; avatar_url: string }>);
+
+      const countMap = (offerCounts || []).reduce((acc, o) => {
+        acc[o.request_id] = (acc[o.request_id] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const formattedData = data.map((req) => ({
         ...req,
-        offers_count: req.offers[0]?.count || 0
+        buyer: profileMap[req.buyer_id] || { username: 'Unknown', avatar_url: '' },
+        offers_count: countMap[req.id] || 0
       }));
 
       setRequests(formattedData);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
     }

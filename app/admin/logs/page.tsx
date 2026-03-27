@@ -2,56 +2,109 @@
 
 import React from 'react';
 import { 
-  History, 
   Search, 
-  Filter, 
-  MoreVertical, 
-  ChevronRight,
-  Calendar,
-  User,
-  ShieldCheck,
-  CreditCard,
-  AlertCircle,
-  Clock,
-  Tag,
-  ArrowRight,
-  ExternalLink,
-  Activity,
+  ShieldCheck, 
   DollarSign
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
-import Link from 'next/link';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
+interface AdminLog {
+  id: string;
+  admin_id: string;
+  action_type: string;
+  target_type: string;
+  target_id: string;
+  created_at: string;
+  admin?: {
+    username: string;
+    avatar_url: string | null;
+  };
+}
+
+interface TransactionLog {
+  id: string;
+  user_id: string;
+  type: string;
+  amount: number;
+  reference_id?: string;
+  external_id?: string;
+  created_at: string;
+  user?: {
+    username: string;
+    avatar_url: string | null;
+  };
+}
+
 export default function AdminLogsPage() {
-  const supabase = createClient();
-  const [logs, setLogs] = React.useState<any[]>([]);
+  const [logs, setLogs] = React.useState<(AdminLog | TransactionLog)[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [logType, setLogType] = React.useState<'admin' | 'transaction'>('admin');
 
   React.useEffect(() => {
+    const supabase = createClient();
     async function fetchLogs() {
       try {
-        let query;
+        setLoading(true);
         if (logType === 'admin') {
-          query = supabase.from('admin_activity_logs').select(`
-            *,
-            admin:profiles!admin_activity_logs_admin_id_fkey(username, avatar_url)
-          `).order('created_at', { ascending: false });
-        } else {
-          query = supabase.from('wallet_transactions').select(`
-            *,
-            user:profiles!wallet_transactions_user_id_fkey(username, avatar_url)
-          `).order('created_at', { ascending: false });
-        }
+          const { data: adminLogs, error: logsError } = await supabase
+            .from('admin_activity_logs')
+            .select('id, created_at, admin_id, action_type, target_type, target_id, details')
+            .order('created_at', { ascending: false });
+          
+          if (logsError) throw logsError;
 
-        const { data, error } = await query;
-        if (error) throw error;
-        setLogs(data || []);
-      } catch (error) {
+          if (adminLogs && adminLogs.length > 0) {
+            const adminIds = Array.from(new Set(adminLogs.map(l => l.admin_id)));
+            const { data: profiles } = await supabase
+              .from('profiles')
+              .select('id, username, avatar_url')
+              .in('id', adminIds);
+            
+            const profileMap = (profiles || []).reduce((acc: Record<string, { username: string; avatar_url: string | null }>, p) => {
+              acc[p.id] = p;
+              return acc;
+            }, {});
+
+            setLogs(adminLogs.map(l => ({
+              ...l,
+              admin: profileMap[l.admin_id]
+            })));
+          } else {
+            setLogs([]);
+          }
+        } else {
+          const { data: txLogs, error: logsError } = await supabase
+            .from('wallet_transactions')
+            .select('id, created_at, user_id, type, amount, reference_id, external_id, status, metadata')
+            .order('created_at', { ascending: false });
+          
+          if (logsError) throw logsError;
+
+          if (txLogs && txLogs.length > 0) {
+            const userIds = Array.from(new Set(txLogs.map(l => l.user_id)));
+            const { data: profiles } = await supabase
+              .from('profiles')
+              .select('id, username, avatar_url')
+              .in('id', userIds);
+            
+            const profileMap = (profiles || []).reduce((acc: Record<string, { username: string; avatar_url: string | null }>, p) => {
+              acc[p.id] = p;
+              return acc;
+            }, {});
+
+            setLogs(txLogs.map(l => ({
+              ...l,
+              user: profileMap[l.user_id]
+            })));
+          } else {
+            setLogs([]);
+          }
+        }
+      } catch (error: unknown) {
         console.error('Error fetching logs:', error);
       } finally {
         setLoading(false);
@@ -61,11 +114,21 @@ export default function AdminLogsPage() {
     fetchLogs();
   }, [logType]);
 
-  const filteredLogs = logs.filter(log => 
-    log.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (logType === 'admin' ? log.action_type : log.type)?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (logType === 'admin' ? log.admin?.username : log.user?.username)?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredLogs = logs.filter(log => {
+    const idMatch = log.id.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    if (logType === 'admin') {
+      const adminLog = log as AdminLog;
+      return idMatch || 
+             adminLog.action_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
+             adminLog.admin?.username.toLowerCase().includes(searchQuery.toLowerCase());
+    } else {
+      const txLog = log as TransactionLog;
+      return idMatch || 
+             txLog.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
+             txLog.user?.username.toLowerCase().includes(searchQuery.toLowerCase());
+    }
+  });
 
   return (
     <div className="space-y-8">
@@ -147,7 +210,7 @@ export default function AdminLogsPage() {
                           {logType === 'admin' ? <ShieldCheck className="w-4 h-4" /> : <DollarSign className="w-4 h-4" />}
                         </div>
                         <span className="text-[10px] font-black text-white uppercase tracking-widest">
-                          {(logType === 'admin' ? log.action_type : log.type).replace(/_/g, ' ')}
+                          {(logType === 'admin' ? (log as AdminLog).action_type : (log as TransactionLog).type).replace(/_/g, ' ')}
                         </span>
                       </div>
                     </td>
@@ -155,22 +218,24 @@ export default function AdminLogsPage() {
                       <div className="flex items-center space-x-2">
                         <div className="w-6 h-6 rounded-full overflow-hidden border border-white/10 bg-zinc-950">
                           <Image 
-                            src={(logType === 'admin' ? log.admin : log.user)?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${logType === 'admin' ? log.admin_id : log.user_id}`}
-                            alt={(logType === 'admin' ? log.admin : log.user)?.username}
+                            src={(logType === 'admin' ? (log as AdminLog).admin : (log as TransactionLog).user)?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${logType === 'admin' ? (log as AdminLog).admin_id : (log as TransactionLog).user_id}`}
+                            alt={(logType === 'admin' ? (log as AdminLog).admin : (log as TransactionLog).user)?.username || 'User'}
                             width={24}
                             height={24}
                             className="object-cover"
                           />
                         </div>
                         <span className="text-[9px] font-medium text-zinc-500 uppercase tracking-widest">
-                          {(logType === 'admin' ? log.admin : log.user)?.username}
+                          {(logType === 'admin' ? (log as AdminLog).admin : (log as TransactionLog).user)?.username}
                         </span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="max-w-[250px]">
                         <p className="text-[9px] font-medium text-zinc-500 uppercase tracking-widest truncate">
-                          {logType === 'admin' ? `Target: ${log.target_type} (${log.target_id?.substr(0, 8)})` : `Ref: ${log.reference_id?.substr(0, 8) || log.external_id?.substr(0, 8) || 'N/A'} | Amount: $${Math.abs(log.amount)}`}
+                          {logType === 'admin' 
+                            ? `Target: ${(log as AdminLog).target_type} (${(log as AdminLog).target_id?.substr(0, 8)})` 
+                            : `Ref: ${(log as TransactionLog).reference_id?.substr(0, 8) || (log as TransactionLog).external_id?.substr(0, 8) || 'N/A'} | Amount: $${Math.abs((log as TransactionLog).amount)}`}
                         </p>
                       </div>
                     </td>

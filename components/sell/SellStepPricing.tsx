@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { Input } from '@/components/ui/Input';
-import { Card } from '@/components/ui/Card';
 import { DollarSign, Clock, Package, Truck } from 'lucide-react';
 
 interface SellStepPricingProps {

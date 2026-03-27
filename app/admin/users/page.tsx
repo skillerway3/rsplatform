@@ -2,15 +2,7 @@
 
 import React from 'react';
 import { 
-  Users, 
   Search, 
-  Filter, 
-  MoreVertical, 
-  ShieldCheck, 
-  UserCheck, 
-  AlertCircle, 
-  ChevronRight,
-  Mail,
   Calendar,
   MessageSquare,
   Star
@@ -21,17 +13,32 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
+interface UserProfile {
+  id: string;
+  username: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  role: string;
+  is_verified_seller: boolean;
+  is_trusted_seller: boolean;
+  email_verified: boolean;
+  is_suspended: boolean;
+  average_rating: number;
+  review_count: number;
+  created_at: string;
+}
+
 export default function AdminUsersPage() {
-  const supabase = createClient();
-  const [users, setUsers] = React.useState<any[]>([]);
+  const [users, setUsers] = React.useState<UserProfile[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [filter, setFilter] = React.useState<'all' | 'verified' | 'trusted' | 'suspended' | 'email_unverified'>('all');
 
   React.useEffect(() => {
+    const supabase = createClient();
     async function fetchUsers() {
       try {
-        let query = supabase.from('profiles').select('*').order('created_at', { ascending: false });
+        let query = supabase.from('profiles').select('id, username, full_name, avatar_url, role, is_verified_seller, is_trusted_seller, email_verified, is_suspended, average_rating, review_count, created_at').order('created_at', { ascending: false });
 
         if (filter === 'verified') query = query.eq('is_verified_seller', true);
         if (filter === 'trusted') query = query.eq('is_trusted_seller', true);
@@ -40,8 +47,8 @@ export default function AdminUsersPage() {
 
         const { data, error } = await query;
         if (error) throw error;
-        setUsers(data || []);
-      } catch (error) {
+        setUsers((data as UserProfile[]) || []);
+      } catch (error: unknown) {
         console.error('Error fetching users:', error);
       } finally {
         setLoading(false);

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { Check, Info, Upload, FileText } from 'lucide-react';
+import { Check, Upload, FileText } from 'lucide-react';
 import { OSRS_BLOOD_TORVA_BOSSES } from '@/data/boosting/osrs-blood-torva';
 import { AccountTypeSelector } from './AccountTypeSelector';
 

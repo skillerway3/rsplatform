@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { Search, Check, X, Info, Upload, FileText } from 'lucide-react';
+import { Search, Check, Upload, FileText } from 'lucide-react';
 import { OSRS_MINIGAMES } from '@/data/boosting/osrs-minigames';
 import { AccountTypeSelector } from './AccountTypeSelector';
 

@@ -3,64 +3,118 @@
 import React from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { 
-  ShoppingBag, 
-  ChevronRight,
-  Calendar,
   DollarSign,
-  Package,
-  Truck,
   CheckCircle,
   Clock,
   AlertCircle,
   ArrowLeft,
-  ShieldAlert,
-  Ban,
-  MoreVertical,
   ExternalLink,
   History,
   MessageSquare,
   CreditCard,
-  User,
   Tag,
-  ShieldCheck
+  Package
 } from 'lucide-react';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
-import Link from 'next/link';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
+
+interface Order {
+  id: string;
+  buyer_id: string;
+  seller_id: string;
+  listing_id: string;
+  total_price: number;
+  status: string;
+  created_at: string;
+  paypal_order_id?: string;
+}
+
+interface OrderDetail extends Order {
+  buyer: {
+    username: string;
+    avatar_url: string | null;
+    full_name: string | null;
+  } | null;
+  seller: {
+    username: string;
+    avatar_url: string | null;
+    full_name: string | null;
+  } | null;
+  listing: {
+    title: string;
+    price: number;
+  } | null;
+  total_price: number;
+}
+
+interface HistoryItem {
+  id: string;
+  order_id: string;
+  old_status: string;
+  new_status: string;
+  changed_by: string;
+  created_at: string;
+}
+
+interface LogItem {
+  id: string;
+  action_type: string;
+  payment_provider: string | null;
+  amount: number;
+  created_at: string;
+}
 
 export default function AdminOrderDetailPage() {
   const { id } = useParams();
   const router = useRouter();
-  const supabase = createClient();
-  const [order, setOrder] = React.useState<any>(null);
-  const [history, setHistory] = React.useState<any[]>([]);
-  const [logs, setLogs] = React.useState<any[]>([]);
+  const [order, setOrder] = React.useState<OrderDetail | null>(null);
+  const [history, setHistory] = React.useState<HistoryItem[]>([]);
+  const [logs, setLogs] = React.useState<LogItem[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [isUpdating, setIsUpdating] = React.useState(false);
 
   React.useEffect(() => {
+    const supabase = createClient();
     async function fetchOrderDetail() {
       try {
+        setLoading(true);
         const [
           { data: orderData, error: orderError },
           { data: historyData },
           { data: logsData }
         ] = await Promise.all([
-          supabase.from('orders').select(`
-            *,
-            buyer:profiles!orders_buyer_id_fkey(*),
-            seller:profiles!orders_seller_id_fkey(*),
-            listing:listings(*)
-          `).eq('id', id).single(),
-          supabase.from('order_status_history').select('*').eq('order_id', id).order('created_at', { ascending: false }),
-          supabase.from('transaction_logs').select('*').eq('order_id', id).order('created_at', { ascending: false })
+          supabase.from('orders').select('id, created_at, buyer_id, seller_id, listing_id, total_price, status, paypal_order_id').eq('id', id).single(),
+          supabase.from('order_status_history').select('id, order_id, old_status, new_status, created_at, changed_by').eq('order_id', id).order('created_at', { ascending: false }),
+          supabase.from('transaction_logs').select('id, action_type, payment_provider, amount, created_at').eq('order_id', id).order('created_at', { ascending: false })
         ]);
 
         if (orderError) throw orderError;
 
-        setOrder(orderData);
+        if (orderData) {
+          // Fetch related data in parallel
+          const [
+            { data: buyerProfile },
+            { data: sellerProfile },
+            { data: listingData }
+          ] = await Promise.all([
+            supabase.from('profiles').select('id, username, avatar_url, full_name').eq('id', orderData.buyer_id).single(),
+            supabase.from('profiles').select('id, username, avatar_url, full_name').eq('id', orderData.seller_id).single(),
+            supabase.from('listings').select('id, title, game, category, price, status').eq('id', orderData.listing_id).single()
+          ]);
+
+          const orderWithRelations = {
+            ...orderData,
+            buyer: buyerProfile,
+            seller: sellerProfile,
+            listing: listingData
+          };
+
+          setOrder(orderWithRelations);
+        }
+        
         setHistory(historyData || []);
         setLogs(logsData || []);
       } catch (error) {
@@ -72,10 +126,12 @@ export default function AdminOrderDetailPage() {
     }
 
     if (id) fetchOrderDetail();
-  }, [id]);
+  }, [id, router]);
 
   const handleUpdateStatus = async (newStatus: string) => {
+    if (!order) return;
     setIsUpdating(true);
+    const supabase = createClient();
     try {
       const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', id);
       if (error) throw error;
@@ -85,15 +141,14 @@ export default function AdminOrderDetailPage() {
         order_id: id,
         old_status: order.status,
         new_status: newStatus,
-        changed_by: (await supabase.auth.getUser()).data.user?.id,
-        reason: 'Administrative action'
+        changed_by: (await supabase.auth.getUser()).data.user?.id
       });
 
       setOrder({ ...order, status: newStatus });
       
       // Refresh history
-      const { data: newHistory } = await supabase.from('order_status_history').select('*').eq('order_id', id).order('created_at', { ascending: false });
-      setHistory(newHistory || []);
+      const { data: newHistory } = await supabase.from('order_status_history').select('id, order_id, old_status, new_status, created_at, changed_by').eq('order_id', id).order('created_at', { ascending: false });
+      setHistory((newHistory as HistoryItem[]) || []);
     } catch (error) {
       console.error('Error updating order status:', error);
     } finally {
@@ -119,6 +174,8 @@ export default function AdminOrderDetailPage() {
     }
   };
 
+  if (!order) return null;
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -130,7 +187,7 @@ export default function AdminOrderDetailPage() {
             </button>
           </Link>
           <div className="flex flex-col space-y-1">
-            <h1 className="text-2xl font-black text-white uppercase tracking-tighter">Order: {order.order_code || order.id.substr(0, 12)}</h1>
+            <h1 className="text-2xl font-black text-white uppercase tracking-tighter">Order: {order.id.substr(0, 12)}</h1>
             <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Transaction ID: {order.id}</p>
           </div>
         </div>
@@ -160,14 +217,8 @@ export default function AdminOrderDetailPage() {
           <div className="bg-zinc-900 border border-white/5 rounded-3xl overflow-hidden">
             <div className="p-8 border-b border-white/5 flex items-center justify-between">
               <div className="flex items-center space-x-4">
-                <div className="w-16 h-16 rounded-2xl overflow-hidden border border-white/10 bg-zinc-950">
-                  <Image 
-                    src={order.listing?.image_url || 'https://picsum.photos/seed/listing/200/200'}
-                    alt={order.listing?.title}
-                    width={64}
-                    height={64}
-                    className="object-cover"
-                  />
+                <div className="w-16 h-16 rounded-2xl overflow-hidden border border-white/10 bg-zinc-950 flex items-center justify-center">
+                  <Package className="w-6 h-6 text-zinc-600" />
                 </div>
                 <div>
                   <h2 className="text-lg font-black text-white uppercase tracking-widest mb-1">{order.listing?.title}</h2>
@@ -178,7 +229,7 @@ export default function AdminOrderDetailPage() {
                     )}>
                       {order.status}
                     </span>
-                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Qty: {order.quantity}</span>
+                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Qty: 1</span>
                   </div>
                 </div>
               </div>
@@ -198,14 +249,14 @@ export default function AdminOrderDetailPage() {
                   <div className="w-12 h-12 rounded-xl overflow-hidden border border-white/10 bg-zinc-950 group-hover:border-amber-500/30 transition-all">
                     <Image 
                       src={order.buyer?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${order.buyer_id}`}
-                      alt={order.buyer?.username}
+                      alt={order.buyer?.username || 'Buyer'}
                       width={48}
                       height={48}
                       className="object-cover"
                     />
                   </div>
                   <div>
-                    <p className="text-[11px] font-black text-white uppercase tracking-widest group-hover:text-amber-500 transition-colors">{order.buyer?.username}</p>
+                    <p className="text-[11px] font-black text-white uppercase tracking-widest group-hover:text-amber-500 transition-colors">{order.buyer?.username || 'Unknown'}</p>
                     <p className="text-[9px] font-medium text-zinc-500 uppercase tracking-widest">{order.buyer?.full_name || 'No Full Name'}</p>
                   </div>
                   <ExternalLink className="w-3 h-3 text-zinc-700 group-hover:text-amber-500 transition-colors" />
@@ -217,14 +268,14 @@ export default function AdminOrderDetailPage() {
                   <div className="w-12 h-12 rounded-xl overflow-hidden border border-white/10 bg-zinc-950 group-hover:border-amber-500/30 transition-all">
                     <Image 
                       src={order.seller?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${order.seller_id}`}
-                      alt={order.seller?.username}
+                      alt={order.seller?.username || 'Seller'}
                       width={48}
                       height={48}
                       className="object-cover"
                     />
                   </div>
                   <div>
-                    <p className="text-[11px] font-black text-white uppercase tracking-widest group-hover:text-amber-500 transition-colors">{order.seller?.username}</p>
+                    <p className="text-[11px] font-black text-white uppercase tracking-widest group-hover:text-amber-500 transition-colors">{order.seller?.username || 'Unknown'}</p>
                     <p className="text-[9px] font-medium text-zinc-500 uppercase tracking-widest">{order.seller?.full_name || 'No Full Name'}</p>
                   </div>
                   <ExternalLink className="w-3 h-3 text-zinc-700 group-hover:text-amber-500 transition-colors" />
@@ -249,7 +300,7 @@ export default function AdminOrderDetailPage() {
                   <p className="text-zinc-500 text-xs font-medium">No transaction logs found for this order.</p>
                 </div>
               ) : (
-                logs.map((log: any) => (
+                logs.map((log) => (
                   <div key={log.id} className="p-4 flex items-center justify-between hover:bg-white/5 transition-colors">
                     <div className="flex items-center space-x-4">
                       <div className="w-10 h-10 bg-zinc-950 rounded-xl flex items-center justify-center border border-white/5">
@@ -283,7 +334,7 @@ export default function AdminOrderDetailPage() {
             </div>
             <div className="p-6">
               <div className="space-y-8 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-px before:bg-white/5">
-                {history.map((item: any, idx: number) => (
+                {history.map((item, idx) => (
                   <div key={item.id} className="relative pl-10">
                     <div className={cn(
                       "absolute left-0 top-1 w-6 h-6 rounded-full flex items-center justify-center border-2 border-zinc-900 z-10",
@@ -301,9 +352,6 @@ export default function AdminOrderDetailPage() {
                       <p className="text-[9px] font-medium text-zinc-500 uppercase tracking-widest">
                         {new Date(item.created_at).toLocaleString()}
                       </p>
-                      {item.reason && (
-                        <p className="text-[9px] font-medium text-zinc-600 italic">"{item.reason}"</p>
-                      )}
                     </div>
                   </div>
                 ))}

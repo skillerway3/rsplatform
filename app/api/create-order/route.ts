@@ -47,13 +47,12 @@ export async function POST(req: Request) {
 
     let sellerId: string;
     let price: number;
-    let title: string;
 
     if (listingId) {
       // 2a. Fetch listing details
       const { data: listing, error: listingError } = await supabaseAdmin
         .from('listings')
-        .select('*')
+        .select('id, seller_id, price, title')
         .eq('id', listingId)
         .single();
 
@@ -62,12 +61,11 @@ export async function POST(req: Request) {
       }
       sellerId = listing.seller_id;
       price = listing.price;
-      title = listing.title;
     } else {
       // 2b. Fetch offer details
       const { data: offer, error: offerError } = await supabaseAdmin
         .from('buyer_request_offers')
-        .select('*, buyer_requests(title)')
+        .select('id, seller_id, price, buyer_requests(title)')
         .eq('id', offerId)
         .eq('request_id', requestId)
         .single();
@@ -77,7 +75,7 @@ export async function POST(req: Request) {
       }
       sellerId = offer.seller_id;
       price = offer.price;
-      title = offer.buyer_requests?.title || 'Custom Request';
+      // title = offer.buyer_requests?.title || 'Custom Request';
     }
 
     // 3. Get PayPal access token
@@ -136,35 +134,28 @@ export async function POST(req: Request) {
     }
 
     // 7. Create order in Supabase
-    const platformFee = Number((price * 0.05).toFixed(2));
-    const sellerPayout = Number((price - platformFee).toFixed(2));
-
-    const orderData: any = {
+    const orderData: Record<string, unknown> = {
       buyer_id: user.id,
       seller_id: sellerId,
       total_price: price,
-      platform_fee: platformFee,
-      seller_payout: sellerPayout,
       status: 'processing',
-      payment_id: paymentId,
-      payment_provider: 'paypal',
-      metadata: {
-        paypal_details: captureData,
-        title: title
-      }
+      paypal_order_id: paymentId,
+      currency: 'USD'
     };
 
     if (listingId) {
       orderData.listing_id = listingId;
-    } else {
+    } else if (requestId) {
       orderData.request_id = requestId;
-      orderData.offer_id = offerId;
+      if (offerId) {
+        orderData.offer_id = offerId;
+      }
     }
 
     const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
       .insert(orderData)
-      .select()
+      .select('id')
       .single();
 
     if (orderError) {
@@ -195,8 +186,9 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ order }, { status: 201 });
-  } catch (err: any) {
-    console.error('Order creation API error:', err);
-    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
+  } catch (err: unknown) {
+    const error = err as Error;
+    console.error('Order creation API error:', error);
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
 }

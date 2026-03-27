@@ -2,8 +2,7 @@
 
 import React from 'react';
 import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { CheckCircle2, ShieldCheck, AlertCircle } from 'lucide-react';
+import { ShieldCheck, AlertCircle } from 'lucide-react';
 
 interface SellStepReviewProps {
   formData: {

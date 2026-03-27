@@ -3,12 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Search, 
-  Filter, 
   AlertTriangle,
   Scale,
   MessageSquare,
-  CheckCircle2,
-  XCircle,
   Clock,
   User,
   ExternalLink,
@@ -47,37 +44,37 @@ export default function AdminDisputesPage() {
   const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => {
+    const fetchDisputes = async () => {
+      setLoading(true);
+      try {
+        let query = supabase
+          .from('disputes')
+          .select(`
+            *,
+            initiator:profiles!disputes_raised_by_fkey(username),
+            order:orders(
+              total_price,
+              listing:listings(title)
+            )
+          `)
+          .order('created_at', { ascending: false });
+
+        if (statusFilter !== 'all') {
+          query = query.eq('status', statusFilter);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        setDisputes(data || []);
+      } catch (error: unknown) {
+        console.error('Error fetching disputes:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchDisputes();
   }, [statusFilter]);
-
-  const fetchDisputes = async () => {
-    setLoading(true);
-    try {
-      let query = supabase
-        .from('disputes')
-        .select(`
-          *,
-          initiator:profiles!disputes_raised_by_fkey(username),
-          order:orders(
-            total_price,
-            listing:listings(title)
-          )
-        `)
-        .order('created_at', { ascending: false });
-
-      if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      setDisputes(data || []);
-    } catch (error) {
-      console.error('Error fetching disputes:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const filteredDisputes = disputes.filter(d => 
     d.order?.listing?.title.toLowerCase().includes(search.toLowerCase()) ||

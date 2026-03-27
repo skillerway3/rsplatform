@@ -60,11 +60,11 @@ export function BoostingOrderCard({ options, onOptionChange, summary, className 
           category: summary.category || 'boosting',
           game: summary.game || 'OSRS',
           title: `Request for ${summary.service}`,
-          description: `Service: ${summary.service}\nDetails: ${summary.details.join(', ')}\nOptions: ${Object.entries(options).filter(([_, v]) => v).map(([k]) => k).join(', ')}`,
+          description: `Service: ${summary.service}\nDetails: ${summary.details.join(', ')}\nOptions: ${Object.entries(options).filter(([, v]) => v).map(([k]) => k).join(', ')}`,
           status: 'open',
           expires_at: expiresAt.toISOString()
         })
-        .select()
+        .select('id')
         .single();
 
       if (supabaseError) {
@@ -84,7 +84,7 @@ export function BoostingOrderCard({ options, onOptionChange, summary, className 
         console.error('Router redirect failed, falling back to window.location:', redirectError);
         window.location.href = `/marketplace/requests/${data.id}`;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error submitting request:', err);
       setError(err.message || 'An unexpected error occurred. Please try again.');
     } finally {
@@ -97,7 +97,7 @@ export function BoostingOrderCard({ options, onOptionChange, summary, className 
       {/* Subtle Glow Behind Card */}
       <div className="absolute -inset-4 bg-amber-500/5 blur-[60px] rounded-full opacity-0 group-hover/sticky:opacity-100 transition-opacity duration-1000 pointer-events-none" />
       
-      <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-8 backdrop-blur-xl shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] relative overflow-hidden group">
+      <div className="bg-zinc-900 border border-zinc-800/50 rounded-[2.5rem] p-8 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] relative overflow-hidden group">
         {/* Animated Top Border */}
         <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-amber-500/40 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-700" />
         
@@ -228,7 +228,7 @@ export function BoostingOrderCard({ options, onOptionChange, summary, className 
       </div>
 
       {/* Trust Badge */}
-      <div className="bg-emerald-500/[0.03] border border-emerald-500/10 rounded-[2rem] p-6 flex items-start gap-5 backdrop-blur-md relative overflow-hidden group/shield shadow-xl">
+      <div className="bg-emerald-500/[0.03] border border-emerald-500/10 rounded-[2rem] p-6 flex items-start gap-5 relative overflow-hidden group/shield shadow-xl">
         <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 blur-[40px] rounded-full -mr-16 -mt-16 group-hover/shield:bg-emerald-500/10 transition-colors duration-700" />
         <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0 shadow-lg group-hover/shield:scale-110 transition-transform duration-500">
           <ShieldCheck className="w-6 h-6 text-emerald-500" />

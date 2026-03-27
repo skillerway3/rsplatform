@@ -7,8 +7,6 @@ import {
   Search,
   User,
   Star,
-  CheckCircle2,
-  XCircle,
   Loader2,
   ChevronLeft,
   ShieldAlert,
@@ -45,7 +43,7 @@ export default function AdminSellersPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from('profiles')
-      .select('*')
+      .select('id, username, full_name, avatar_url, is_verified_seller, is_trusted_seller, manual_trusted_override, average_rating, review_count, created_at')
       .order('created_at', { ascending: false });
 
     if (!error && data) {
@@ -100,7 +98,7 @@ export default function AdminSellersPage() {
           is_trusted_seller: !currentOverride || (p.average_rating >= 4.5 && p.review_count >= 10)
         } : p
       ));
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error toggling trusted override:', err);
     } finally {
       setProcessingId(null);

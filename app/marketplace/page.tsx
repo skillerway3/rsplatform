@@ -3,7 +3,6 @@
 import * as React from 'react';
 import { 
   ShoppingBag, 
-  Search, 
   FileText, 
   PlusCircle, 
   ArrowRight,
@@ -12,7 +11,6 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 
@@ -21,8 +19,7 @@ export default function MarketplaceLandingPage() {
     <div className="pt-32 pb-32 bg-zinc-950 min-h-screen relative overflow-hidden">
       {/* Background Glows */}
       <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-amber-500/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-zinc-100/5 rounded-full blur-[120px]" />
+
       </div>
 
       <div className="container mx-auto px-6 relative z-10">
@@ -87,7 +84,7 @@ export default function MarketplaceLandingPage() {
                   </div>
                   <h2 className="text-3xl font-black text-white uppercase tracking-tight mb-4">Buyer Requests</h2>
                   <p className="text-zinc-500 mb-8 flex-grow">
-                    Can't find what you're looking for? Post a custom request and let sellers come to you with their best offers.
+                    Can&apos;t find what you&apos;re looking for? Post a custom request and let sellers come to you with their best offers.
                   </p>
                   <div className="flex items-center gap-2 text-blue-500 text-[10px] font-black uppercase tracking-widest">
                     View Requests <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />

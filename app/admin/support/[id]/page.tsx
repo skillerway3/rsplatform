@@ -3,24 +3,15 @@
 import React from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { 
-  MessageSquare, 
-  ChevronRight,
-  Calendar,
-  User,
-  Clock,
-  AlertCircle,
-  Star,
-  CheckCircle,
-  ShieldCheck,
-  Flag,
-  UserPlus,
-  ArrowLeft,
-  Send,
-  MoreVertical,
+  Calendar, 
+  Clock, 
+  Star, 
+  CheckCircle, 
+  UserPlus, 
+  ArrowLeft, 
+  Send, 
   ExternalLink,
-  History,
   Lock,
-  Unlock,
   Trash2
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
@@ -29,19 +20,57 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
+interface Profile {
+  id: string;
+  username: string;
+  avatar_url: string | null;
+  full_name?: string | null;
+  is_verified_seller?: boolean;
+  average_rating?: number;
+}
+
+interface SupportMessage {
+  id: string;
+  thread_id: string;
+  sender_id: string;
+  content: string;
+  sender_type: 'user' | 'admin';
+  created_at: string;
+  sender?: Profile | null;
+}
+
+interface SupportThread {
+  id: string;
+  user_id: string;
+  subject: string;
+  status: 'open' | 'pending' | 'resolved' | 'closed';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  assigned_to: string | null;
+  created_at: string;
+  last_message_at: string;
+  user?: Profile | null;
+  assigned_admin?: Profile | null;
+}
+
+interface User {
+  id: string;
+  email?: string;
+}
+
 export default function AdminSupportDetailPage() {
   const { id } = useParams();
   const router = useRouter();
-  const supabase = createClient();
-  const [thread, setThread] = React.useState<any>(null);
-  const [messages, setMessages] = React.useState<any[]>([]);
+  const [thread, setThread] = React.useState<SupportThread | null>(null);
+  const [messages, setMessages] = React.useState<SupportMessage[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [newMessage, setNewMessage] = React.useState('');
   const [isSending, setIsSending] = React.useState(false);
-  const [currentUser, setCurrentUser] = React.useState<any>(null);
+  const [currentUser, setCurrentUser] = React.useState<User | null>(null);
 
   React.useEffect(() => {
+    const supabase = createClient();
     async function fetchThreadDetail() {
+      if (!id) return;
       try {
         const { data: { user } } = await supabase.auth.getUser();
         setCurrentUser(user);
@@ -50,8 +79,8 @@ export default function AdminSupportDetailPage() {
           { data: threadData, error: threadError },
           { data: messagesData }
         ] = await Promise.all([
-          supabase.from('support_threads').select('*').eq('id', id).single(),
-          supabase.from('support_messages').select('*').eq('thread_id', id).order('created_at', { ascending: true })
+          supabase.from('support_threads').select('id, user_id, subject, status, priority, category, assigned_to, created_at, updated_at, last_message_at').eq('id', id).single(),
+          supabase.from('support_messages').select('id, thread_id, sender_id, content, sender_type, created_at, read_at').eq('thread_id', id).order('created_at', { ascending: true })
         ]);
 
         if (threadError) throw threadError;
@@ -66,29 +95,29 @@ export default function AdminSupportDetailPage() {
 
         const { data: profilesData } = await supabase
           .from('profiles')
-          .select('*')
+          .select('id, username, avatar_url, role')
           .in('id', Array.from(profileIds));
 
         const profileMap = (profilesData || []).reduce((acc, p) => {
           acc[p.id] = p;
           return acc;
-        }, {} as Record<string, any>);
+        }, {} as Record<string, Profile>);
 
         // Transform data
-        const transformedThread = {
+        const transformedThread: SupportThread = {
           ...threadData,
           user: profileMap[threadData.user_id] || null,
           assigned_admin: profileMap[threadData.assigned_to] || null
         };
 
-        const transformedMessages = (messagesData || []).map(msg => ({
+        const transformedMessages: SupportMessage[] = (messagesData || []).map(msg => ({
           ...msg,
           sender: profileMap[msg.sender_id] || null
         }));
 
         setThread(transformedThread);
         setMessages(transformedMessages);
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Error fetching thread detail:', error);
         router.push('/admin/support');
       } finally {
@@ -96,7 +125,7 @@ export default function AdminSupportDetailPage() {
       }
     }
 
-    if (id) fetchThreadDetail();
+    fetchThreadDetail();
 
     // Subscribe to new messages
     const channel = supabase
@@ -109,7 +138,7 @@ export default function AdminSupportDetailPage() {
       }, async (payload) => {
         const { data: newMessageData } = await supabase
           .from('support_messages')
-          .select('*')
+          .select('id, thread_id, sender_id, content, sender_type, created_at, read_at')
           .eq('id', payload.new.id)
           .single();
         
@@ -117,11 +146,11 @@ export default function AdminSupportDetailPage() {
           // Fetch sender profile
           const { data: senderData } = await supabase
             .from('profiles')
-            .select('*')
+            .select('id, username, avatar_url, role')
             .eq('id', newMessageData.sender_id)
             .single();
 
-          const transformedMessage = {
+          const transformedMessage: SupportMessage = {
             ...newMessageData,
             sender: senderData || null
           };
@@ -133,12 +162,14 @@ export default function AdminSupportDetailPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [id]);
+  }, [id, router]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || isSending) return;
+    if (!newMessage.trim() || isSending || !thread || !currentUser) return;
 
+    if (!newMessage.trim() || !currentUser || !thread) return;
+    const supabase = createClient();
     setIsSending(true);
     try {
       const { error } = await supabase.from('support_messages').insert({
@@ -157,19 +188,21 @@ export default function AdminSupportDetailPage() {
       }).eq('id', id);
 
       setNewMessage('');
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error sending message:', error);
     } finally {
       setIsSending(false);
     }
   };
 
-  const handleUpdateThread = async (updates: any) => {
+  const handleUpdateThread = async (updates: Partial<SupportThread>) => {
+    if (!thread) return;
+    const supabase = createClient();
     try {
       const { error } = await supabase.from('support_threads').update(updates).eq('id', id);
       if (error) throw error;
-      setThread({ ...thread, ...updates });
-    } catch (error) {
+      setThread({ ...thread, ...updates } as SupportThread);
+    } catch (error: unknown) {
       console.error('Error updating thread:', error);
     }
   };
@@ -181,6 +214,8 @@ export default function AdminSupportDetailPage() {
       </div>
     );
   }
+
+  if (!thread || !currentUser) return null;
 
   return (
     <div className="h-[calc(100vh-120px)] flex flex-col space-y-6">
@@ -224,13 +259,13 @@ export default function AdminSupportDetailPage() {
                 <div className="w-6 h-6 rounded-full overflow-hidden border border-white/10 bg-zinc-950">
                   <Image 
                     src={thread.assigned_admin?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${thread.assigned_to}`}
-                    alt={thread.assigned_admin?.username}
+                    alt={thread.assigned_admin?.username || 'Admin'}
                     width={24}
                     height={24}
                     className="object-cover"
                   />
                 </div>
-                <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{thread.assigned_admin?.username}</span>
+                <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{thread.assigned_admin?.username || 'Unassigned'}</span>
               </div>
               <Button 
                 variant="outline" 
@@ -262,7 +297,7 @@ export default function AdminSupportDetailPage() {
                 <div className="flex-shrink-0 w-8 h-8 rounded-lg overflow-hidden border border-white/10 bg-zinc-950">
                   <Image 
                     src={msg.sender?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.sender_id}`}
-                    alt={msg.sender?.username}
+                    alt={msg.sender?.username || 'Sender'}
                     width={32}
                     height={32}
                     className="object-cover"
@@ -273,7 +308,7 @@ export default function AdminSupportDetailPage() {
                   msg.sender_id === currentUser.id ? "items-end" : "items-start"
                 )}>
                   <div className="flex items-center space-x-2 mb-1">
-                    <span className="text-[9px] font-black text-white uppercase tracking-widest">{msg.sender?.username}</span>
+                    <span className="text-[9px] font-black text-white uppercase tracking-widest">{msg.sender?.username || 'Unknown'}</span>
                     <span className="text-[8px] font-medium text-zinc-600 uppercase tracking-widest">{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
                   <div className={cn(
@@ -318,14 +353,14 @@ export default function AdminSupportDetailPage() {
               <div className="w-12 h-12 rounded-xl overflow-hidden border border-white/10 bg-zinc-950 group-hover:border-amber-500/30 transition-all">
                 <Image 
                   src={thread.user?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${thread.user_id}`}
-                  alt={thread.user?.username}
+                  alt={thread.user?.username || 'User'}
                   width={48}
                   height={48}
                   className="object-cover"
                 />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-black text-white uppercase tracking-widest truncate group-hover:text-amber-500 transition-colors">{thread.user?.username}</p>
+                <p className="text-[11px] font-black text-white uppercase tracking-widest truncate group-hover:text-amber-500 transition-colors">{thread.user?.username || 'Unknown'}</p>
                 <p className="text-[9px] font-medium text-zinc-500 uppercase tracking-widest truncate">{thread.user?.full_name || 'No Full Name'}</p>
               </div>
               <ExternalLink className="w-3 h-3 text-zinc-700 group-hover:text-amber-500 transition-colors" />

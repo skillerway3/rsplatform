@@ -1,28 +1,18 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Clock, 
-  DollarSign, 
-  ChevronRight, 
-  ShieldCheck, 
   AlertCircle,
   CheckCircle2,
-  XCircle,
-  MessageSquare,
-  Zap,
   Loader2,
   Package,
-  ExternalLink,
   ArrowRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 
 interface Order {
   id: string;
@@ -31,31 +21,26 @@ interface Order {
   seller_payout: number;
   status: string;
   created_at: string;
+  buyer_id: string;
+  listing_id: string | null;
+  request_id: string | null;
   buyer: {
     username: string;
     avatar_url: string;
-  } | {
-    username: string;
-    avatar_url: string;
-  }[];
+  };
   listing?: {
     title: string;
     category: string;
-  } | {
-    title: string;
-    category: string;
-  }[];
+  };
   request?: {
     title: string;
     category: string;
-  } | {
-    title: string;
-    category: string;
-  }[];
+  };
 }
 
 export default function SellerSalesPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,10 +49,10 @@ export default function SellerSalesPage() {
     if (!user) return;
     try {
       setLoading(true);
-      // Simplified query: Fetch orders first, then related data
+      // Corrected query: Use total_price, platform_fee, seller_payout, and request_id
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
-        .select('id, total_price, platform_fee, seller_payout, status, created_at, buyer_id, listing_id, buyer_request_id')
+        .select('id, total_price, platform_fee, seller_payout, status, created_at, buyer_id, listing_id, request_id')
         .eq('seller_id', user.id)
         .order('created_at', { ascending: false });
 
@@ -80,39 +65,41 @@ export default function SellerSalesPage() {
       // Fetch related data in parallel
       const buyerIds = Array.from(new Set(ordersData.map(o => o.buyer_id).filter(Boolean)));
       const listingIds = Array.from(new Set(ordersData.map(o => o.listing_id).filter(Boolean)));
-      const requestIds = Array.from(new Set(ordersData.map(o => o.buyer_request_id).filter(Boolean)));
 
       const [
         { data: buyers },
-        { data: listings },
-        { data: requests }
+        { data: listings }
       ] = await Promise.all([
         supabase.from('profiles').select('id, username, avatar_url').in('id', buyerIds),
-        supabase.from('listings').select('id, title, category').in('id', listingIds),
-        supabase.from('buyer_requests').select('id, title, category').in('id', requestIds)
+        supabase.from('listings').select('id, title, category').in('id', listingIds)
       ]);
 
       // Map related data back to orders
       const enrichedOrders = ordersData.map(order => ({
         ...order,
         buyer: buyers?.find(b => b.id === order.buyer_id) || { username: 'Unknown', avatar_url: '' },
-        listing: listings?.find(l => l.id === order.listing_id),
-        request: requests?.find(r => r.id === order.buyer_request_id)
+        listing: listings?.find(l => l.id === order.listing_id)
       }));
 
-      setOrders(enrichedOrders as any);
-    } catch (err: any) {
-      setError(err.message);
+      setOrders(enrichedOrders as Order[]);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch sales');
     } finally {
       setLoading(false);
     }
   }, [user]);
 
-  useEffect(() => {
-    fetchSales();
-  }, [fetchSales]);
 
-  if (loading) {
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    fetchSales();
+  }, [user, authLoading, fetchSales, router]);
+
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />

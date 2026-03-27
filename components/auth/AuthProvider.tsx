@@ -7,7 +7,7 @@ import { User, Session } from '@supabase/supabase-js';
 interface AuthContextType {
   user: User | null;
   session: Session | null;
-  profile: any | null;
+  profile: Record<string, unknown> | null;
   loading: boolean;
   isVerifiedSeller: boolean;
   signOut: () => Promise<void>;
@@ -25,14 +25,14 @@ const AuthContext = createContext<AuthContextType>({
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<any | null>(null);
+  const [profile, setProfile] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, username, avatar_url, is_verified_seller, is_trusted_seller, role, created_at, username_updated_at')
         .eq('id', userId)
         .maybeSingle();
       

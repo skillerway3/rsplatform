@@ -2,36 +2,37 @@
 
 import React from 'react';
 import { 
-  ShieldCheck, 
   Search, 
-  Filter, 
-  MoreVertical, 
-  ChevronRight,
-  Calendar,
-  User,
-  Clock,
-  AlertCircle,
   CheckCircle,
   XCircle,
   FileText,
-  ExternalLink,
-  ShieldAlert,
   UserCheck
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase';
+import { createClient, supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
-import Link from 'next/link';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
+interface Verification {
+  id: string;
+  user_id: string;
+  document_type: string;
+  id_front_url: string;
+  id_back_url: string | null;
+  selfie_url: string;
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+  user: { username: string; avatar_url: string | null; full_name: string | null } | null;
+}
+
 export default function AdminVerificationPage() {
-  const supabase = createClient();
-  const [verifications, setVerifications] = React.useState<any[]>([]);
+  const [verifications, setVerifications] = React.useState<Verification[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [filter, setFilter] = React.useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
 
   React.useEffect(() => {
+    const supabase = createClient();
     async function fetchVerifications() {
       try {
         let query = supabase.from('seller_verifications').select(`
@@ -45,8 +46,8 @@ export default function AdminVerificationPage() {
 
         const { data, error } = await query;
         if (error) throw error;
-        setVerifications(data || []);
-      } catch (error) {
+        setVerifications((data as unknown as Verification[]) || []);
+      } catch (error: unknown) {
         console.error('Error fetching verifications:', error);
       } finally {
         setLoading(false);
@@ -57,11 +58,13 @@ export default function AdminVerificationPage() {
   }, [filter]);
 
   const handleUpdateStatus = async (id: string, userId: string, status: 'approved' | 'rejected') => {
+    const supabase = createClient();
     try {
+      const { data: { user: adminUser } } = await supabase.auth.getUser();
       const { error: verifyError } = await supabase.from('seller_verifications').update({ 
         status,
         reviewed_at: new Date().toISOString(),
-        reviewed_by: (await supabase.auth.getUser()).data.user?.id
+        reviewed_by: adminUser?.id
       }).eq('id', id);
 
       if (verifyError) throw verifyError;
@@ -72,7 +75,7 @@ export default function AdminVerificationPage() {
 
       // Refresh list
       setVerifications(prev => prev.filter(v => v.id !== id));
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error updating verification:', error);
     }
   };
@@ -136,14 +139,14 @@ export default function AdminVerificationPage() {
                   <div className="w-10 h-10 rounded-xl overflow-hidden border border-white/10 bg-zinc-950">
                     <Image 
                       src={v.user?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${v.user_id}`}
-                      alt={v.user?.username}
+                      alt={v.user?.username || 'User'}
                       width={40}
                       height={40}
                       className="object-cover"
                     />
                   </div>
                   <div>
-                    <p className="text-[11px] font-black text-white uppercase tracking-widest">{v.user?.username}</p>
+                    <p className="text-[11px] font-black text-white uppercase tracking-widest">{v.user?.username || 'Unknown'}</p>
                     <p className="text-[9px] font-medium text-zinc-500 uppercase tracking-widest">{v.user?.full_name || 'No Full Name'}</p>
                   </div>
                 </div>

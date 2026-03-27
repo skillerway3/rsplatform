@@ -24,7 +24,7 @@ interface ServiceFormLayoutProps {
   className?: string;
 }
 
-function TrustBenefit({ icon: Icon, title, description, color }: { icon: any, title: string, description: string, color: string }) {
+function TrustBenefit({ icon: Icon, title, description, color }: { icon: React.ElementType, title: string, description: string, color: string }) {
   const colorMap: Record<string, string> = {
     amber: "text-amber-500 bg-amber-500/10 border-amber-500/20",
     emerald: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
@@ -33,7 +33,7 @@ function TrustBenefit({ icon: Icon, title, description, color }: { icon: any, ti
   };
 
   return (
-    <div className="group relative p-8 rounded-[2.5rem] bg-zinc-900/40 border border-zinc-800/50 backdrop-blur-xl transition-all duration-500 hover:border-zinc-700/50 hover:bg-zinc-900/60 overflow-hidden shadow-xl hover:shadow-2xl">
+    <div className="group relative p-8 rounded-[2.5rem] bg-zinc-900 border border-zinc-800/50 transition-all duration-500 hover:border-zinc-700/50 hover:bg-zinc-900/60 overflow-hidden shadow-xl hover:shadow-2xl">
       <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-transparent via-zinc-800 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
       <div className={cn("w-16 h-16 rounded-2xl flex items-center justify-center mb-8 border transition-all group-hover:scale-110 group-hover:rotate-3 duration-500 shadow-lg", colorMap[color])}>
         <Icon className="w-8 h-8" />
@@ -51,10 +51,8 @@ export function ServiceFormLayout({ children, title, description, options, onOpt
   return (
     <div className={cn("grid grid-cols-1 lg:grid-cols-12 gap-12 items-start", className)}>
       <div className="lg:col-span-8 space-y-16">
-        <div className="relative p-12 rounded-[3rem] bg-zinc-900/30 border border-zinc-800/50 backdrop-blur-md shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] animate-in fade-in slide-in-from-left-8 duration-1000">
+        <div className="relative p-12 rounded-[3rem] bg-zinc-900/30 border border-zinc-800/50 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] animate-in fade-in slide-in-from-left-8 duration-1000">
           <div className="absolute inset-0 overflow-hidden rounded-[3rem] pointer-events-none">
-            <div className="absolute -top-24 -right-24 w-96 h-96 bg-amber-500/[0.03] blur-[120px] rounded-full" />
-            <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-blue-500/[0.02] blur-[120px] rounded-full" />
           </div>
           
           <div className="relative space-y-12">

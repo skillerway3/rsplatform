@@ -39,8 +39,9 @@ export async function POST(req: Request) {
       .single();
 
     return NextResponse.json({ success: true, newBalance: profile?.balance || 0 });
-  } catch (err: any) {
-    console.error('Withdrawal error:', err);
-    return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });
+  } catch (err: unknown) {
+    const error = err as Error;
+    console.error('Withdrawal error:', error);
+    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
   }
 }

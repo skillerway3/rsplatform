@@ -122,10 +122,11 @@ export async function POST(req: Request) {
       .single();
 
     return NextResponse.json({ success: true, capture, newBalance: profile?.balance || 0 });
-  } catch (err: any) {
-    console.error('PayPal capture error:', err);
+  } catch (err: unknown) {
+    const error = err as Error;
+    console.error('PayPal capture error:', error);
     return NextResponse.json(
-      { error: err?.message || "Server error" },
+      { error: error?.message || "Server error" },
       { status: 500 }
     );
   }

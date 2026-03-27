@@ -11,9 +11,34 @@ import { DashboardInventory } from '@/components/dashboard/DashboardInventory';
 import { Loader2, ChevronRight, Plus, Zap, DollarSign, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 
+interface DashboardStats {
+  listingCount: number;
+  orderCount: number;
+  requestCount: number;
+  totalRevenue: number;
+  pendingOrders: number;
+  unreadMessages: number;
+}
+
+interface Activity {
+  id: string;
+  createdAt: string;
+  type: 'purchase' | 'sale';
+  amount: number;
+  title: string;
+}
+
+interface ListingSummary {
+  id: string;
+  title: string;
+  price: number;
+  status: string;
+  gameId: string;
+}
+
 export default function DashboardPage() {
   const { user, profile: authProfile, loading: authLoading } = useAuth();
-  const [stats, setStats] = useState({ 
+  const [stats, setStats] = useState<DashboardStats>({ 
     listingCount: 0, 
     orderCount: 0, 
     requestCount: 0, 
@@ -21,11 +46,11 @@ export default function DashboardPage() {
     pendingOrders: 0,
     unreadMessages: 0
   });
-  const [recentOrders, setRecentOrders] = useState<any[]>([]);
-  const [userListings, setUserListings] = useState<any[]>([]);
+  const [recentOrders, setRecentOrders] = useState<Activity[]>([]);
+  const [userListings, setUserListings] = useState<ListingSummary[]>([]);
   const [revenueData, setRevenueData] = useState<{ name: string; value: number }[]>([]);
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<{ username?: string; is_verified_seller?: boolean; is_trusted_seller?: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -61,7 +86,7 @@ export default function DashboardPage() {
           { data: sales, error: sErr },
           { data: requests, error: rErr }
         ] = await Promise.all([
-          supabase.from('listings').select('id, title, price, status').eq('seller_id', user.id),
+          supabase.from('listings').select('id, title, price, status, game').eq('seller_id', user.id),
           supabase.from('orders').select('id, total_price, created_at, status, listing_id').eq('buyer_id', user.id).order('created_at', { ascending: false }).limit(5),
           supabase.from('orders').select('id, total_price, created_at, status, listing_id').eq('seller_id', user.id).order('created_at', { ascending: false }).limit(5),
           supabase.from('buyer_requests').select('id').eq('buyer_id', user.id)
@@ -71,7 +96,12 @@ export default function DashboardPage() {
           throw new Error('Failed to fetch dashboard statistics');
         }
 
-        setUserListings(listings || []);
+        const transformedListings = (listings || []).map(l => ({
+          ...l,
+          gameId: l.game
+        }));
+
+        setUserListings(transformedListings as ListingSummary[]);
 
         // Fetch listing titles separately to avoid nested joins if needed, 
         // but for dashboard recent activity, we can just use the IDs or fetch titles in a second step
@@ -80,7 +110,7 @@ export default function DashboardPage() {
           ...(sales || []).map(s => s.listing_id)
         ].filter(Boolean)));
 
-        let listingTitles: Record<string, string> = {};
+        const listingTitles: Record<string, string> = {};
         if (listingIds.length > 0) {
           const { data: titles } = await supabase
             .from('listings')
@@ -96,15 +126,15 @@ export default function DashboardPage() {
         const pendingSales = sales?.filter(s => s.status === 'pending' || s.status === 'processing').length || 0;
 
         // Merge and sort activities
-        const allActivities = [
-          ...(orders || []).map((order: any) => ({
+        const allActivities: Activity[] = [
+          ...(orders || []).map((order) => ({
             id: order.id,
             createdAt: order.created_at,
             type: 'purchase' as const,
             amount: order.total_price,
             title: listingTitles[order.listing_id] || 'Purchase'
           })),
-          ...(sales || []).map((sale: any) => ({
+          ...(sales || []).map((sale) => ({
             id: sale.id,
             createdAt: sale.created_at,
             type: 'sale' as const,
@@ -148,9 +178,10 @@ export default function DashboardPage() {
           pendingOrders: pendingSales,
           unreadMessages: 0
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load dashboard data';
         console.error('Error fetching dashboard data:', err);
-        setError(err.message || 'Failed to load dashboard data');
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }

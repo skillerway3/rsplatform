@@ -23,7 +23,7 @@ export function ListingGallery({ listing }: ListingGalleryProps) {
         <Badge variant="gold" className="px-6 py-2 text-[10px] font-black uppercase tracking-widest shadow-2xl shadow-black/50">
           {listing.gameId}
         </Badge>
-        <Badge variant="default" className="px-6 py-2 text-[10px] font-black uppercase tracking-widest bg-black/40 backdrop-blur-xl border-white/10 shadow-2xl shadow-black/50">
+        <Badge variant="default" className="px-6 py-2 text-[10px] font-black uppercase tracking-widest bg-black/60 border-white/10 shadow-2xl shadow-black/50">
           {listing.categoryId}
         </Badge>
       </div>

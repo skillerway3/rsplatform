@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/Button';
 import { Listing } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import { PayPalButtons, usePayPalScriptReducer } from "@paypal/react-paypal-js";
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useRouter } from 'next/navigation';
 
@@ -23,7 +22,7 @@ export function PurchaseCard({ listing }: PurchaseCardProps) {
 
   const total = listing.price;
 
-  const handleCreateOrder = async (data: any, actions: any) => {
+  const handleCreateOrder = async (data: Record<string, unknown>, actions: Record<string, unknown>) => {
     return actions.order.create({
       purchase_units: [
         {
@@ -37,7 +36,7 @@ export function PurchaseCard({ listing }: PurchaseCardProps) {
     });
   };
 
-  const handleApprove = async (data: any, actions: any) => {
+  const handleApprove = async (data: Record<string, unknown>) => {
     try {
       setIsProcessing(true);
       
@@ -62,7 +61,7 @@ export function PurchaseCard({ listing }: PurchaseCardProps) {
 
       // Redirect to order page
       router.push(`/orders/${order.id}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Payment/Order creation error:', err);
       // Avoid using alert in iframe
     } finally {
@@ -71,7 +70,7 @@ export function PurchaseCard({ listing }: PurchaseCardProps) {
   };
 
   return (
-    <Card className="border-zinc-800/50 bg-zinc-900/50 backdrop-blur-2xl shadow-[0_64px_128px_-32px_rgba(0,0,0,0.6)] rounded-[3.5rem] overflow-hidden">
+    <Card className="border-zinc-800/50 bg-zinc-900 shadow-[0_64px_128px_-32px_rgba(0,0,0,0.6)] rounded-[3.5rem] overflow-hidden">
       <CardContent className="p-12">
         <div className="text-[10px] text-zinc-600 uppercase font-black tracking-[0.4em] mb-6">Investment</div>
         <div className="text-7xl font-black text-zinc-100 tracking-tighter mb-12 flex items-baseline">

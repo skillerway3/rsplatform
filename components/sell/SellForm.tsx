@@ -58,7 +58,7 @@ export function SellForm() {
 
   if (!isVerifiedSeller) {
     return (
-      <div className="max-w-2xl mx-auto text-center py-20 bg-zinc-900/40 border border-zinc-800/50 rounded-[3rem] p-12 backdrop-blur-xl">
+      <div className="max-w-2xl mx-auto text-center py-20 bg-zinc-900 border border-zinc-800/50 rounded-[3rem] p-12">
         <div className="w-20 h-20 bg-amber-500/10 rounded-3xl flex items-center justify-center mx-auto mb-8 border border-amber-500/20">
           <ShieldCheck className="w-10 h-10 text-amber-500" />
         </div>
@@ -133,7 +133,7 @@ export function SellForm() {
     setError(null);
     
     try {
-      const { data, error: submitError } = await supabase
+      const { error: submitError } = await supabase
         .from('listings')
         .insert({
           seller_id: user.id,
@@ -142,19 +142,19 @@ export function SellForm() {
           price: parseFloat(formData.price),
           game: formData.gameId,
           category: formData.categoryId,
-          images: formData.images.length > 0 ? formData.images : ['https://picsum.photos/seed/listing/800/600'],
+          images: formData.images,
           metadata: isAccount ? formData.accountMetadata : {},
           status: 'active'
         })
-        .select()
+        .select('id')
         .single();
 
       if (submitError) throw submitError;
       
       setIsSuccess(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error publishing listing:', err);
-      setError(err.message || 'Failed to publish listing. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to publish listing. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

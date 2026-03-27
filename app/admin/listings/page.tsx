@@ -3,12 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Search, 
-  Filter, 
-  MoreVertical, 
   Eye, 
   Trash2, 
   CheckCircle2, 
-  XCircle,
   AlertTriangle,
   Tag,
   User,
@@ -19,7 +16,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 
 interface Listing {
   id: string;
@@ -42,52 +39,52 @@ export default function AdminListingsPage() {
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
 
   useEffect(() => {
+    const fetchListings = async () => {
+      setLoading(true);
+      try {
+        let query = supabase
+          .from('listings')
+          .select('id, title, price, status, created_at, seller_id, category')
+          .order('created_at', { ascending: false });
+
+        if (statusFilter !== 'all') {
+          query = query.eq('status', statusFilter);
+        }
+
+        const { data: listingsData, error: listingsError } = await query;
+        if (listingsError) throw listingsError;
+
+        if (listingsData && listingsData.length > 0) {
+          // Fetch seller profiles in parallel
+          const sellerIds = Array.from(new Set(listingsData.map(l => l.seller_id)));
+          const { data: profilesData } = await supabase
+            .from('profiles')
+            .select('id, username')
+            .in('id', sellerIds);
+
+          const profileMap = (profilesData || []).reduce((acc, p) => {
+            acc[p.id] = p;
+            return acc;
+          }, {} as Record<string, { id: string; username: string }>);
+
+          const transformedListings = listingsData.map(listing => ({
+            ...listing,
+            seller: profileMap[listing.seller_id] || null
+          }));
+
+          setListings(transformedListings);
+        } else {
+          setListings([]);
+        }
+      } catch (error: unknown) {
+        console.error('Error fetching listings:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchListings();
   }, [statusFilter]);
-
-  const fetchListings = async () => {
-    setLoading(true);
-    try {
-      let query = supabase
-        .from('listings')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
-      }
-
-      const { data: listingsData, error: listingsError } = await query;
-      if (listingsError) throw listingsError;
-
-      if (listingsData && listingsData.length > 0) {
-        // Fetch seller profiles in parallel
-        const sellerIds = Array.from(new Set(listingsData.map(l => l.seller_id)));
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('id, username')
-          .in('id', sellerIds);
-
-        const profileMap = (profilesData || []).reduce((acc, p) => {
-          acc[p.id] = p;
-          return acc;
-        }, {} as Record<string, any>);
-
-        const transformedListings = listingsData.map(listing => ({
-          ...listing,
-          seller: profileMap[listing.seller_id] || null
-        }));
-
-        setListings(transformedListings);
-      } else {
-        setListings([]);
-      }
-    } catch (error) {
-      console.error('Error fetching listings:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleUpdateStatus = async (id: string, newStatus: Listing['status']) => {
     setIsUpdating(id);
@@ -100,7 +97,7 @@ export default function AdminListingsPage() {
       if (error) throw error;
       
       setListings(listings.map(l => l.id === id ? { ...l, status: newStatus } : l));
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error updating status:', error);
     } finally {
       setIsUpdating(null);

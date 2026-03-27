@@ -1,7 +1,6 @@
 import * as React from 'react';
 import { Settings, Plus, ShieldCheck, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { cn } from '@/lib/utils';
 
 interface DashboardHeaderProps {
   username: string;

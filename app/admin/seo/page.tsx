@@ -6,16 +6,12 @@ import {
   Search, 
   Save, 
   RefreshCw, 
-  FileText, 
-  Settings,
-  CheckCircle2,
   AlertTriangle,
   Loader2,
   ExternalLink
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
-import { cn } from '@/lib/utils';
 import { motion } from 'motion/react';
 
 interface SEOConfig {
@@ -43,12 +39,12 @@ export default function AdminSEOPage() {
     try {
       const { data, error } = await supabase
         .from('seo_config')
-        .select('*')
+        .select('id, page_path, title, description, keywords, og_image, updated_at')
         .order('page_path', { ascending: true });
 
       if (error) throw error;
       setConfigs(data || []);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error fetching SEO configs:', error);
     } finally {
       setLoading(false);
@@ -66,7 +62,7 @@ export default function AdminSEOPage() {
       if (error) throw error;
       
       setConfigs(configs.map(c => c.id === id ? { ...c, ...updates } : c));
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error updating SEO config:', error);
     } finally {
       setSaving(null);

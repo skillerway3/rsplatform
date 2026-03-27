@@ -4,22 +4,15 @@ import React from 'react';
 import { 
   ShieldCheck, 
   UserCheck, 
-  Lock, 
   ShieldAlert, 
   CheckCircle, 
-  AlertTriangle,
-  ArrowRight,
   Shield,
   CreditCard,
   MessageSquare,
   Search,
-  Eye,
-  Scale,
-  Gavel
+  Scale
 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
-import Link from 'next/link';
 import { motion } from 'motion/react';
 
 export default function TrustSafetyPage() {
@@ -102,7 +95,6 @@ export default function TrustSafetyPage() {
       {/* Verification Tiers */}
       <section className="container mx-auto px-6 mb-32">
         <div className="bg-zinc-900 border border-white/5 rounded-[40px] p-12 overflow-hidden relative">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/5 blur-[120px] rounded-full -mr-48 -mt-48" />
           
           <div className="max-w-3xl space-y-8 relative z-10">
             <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Seller Trust Tiers</h2>

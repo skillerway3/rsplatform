@@ -36,7 +36,7 @@ export async function POST(req: Request) {
         content,
         is_read: false
       })
-      .select()
+      .select('id, thread_id, sender_id, sender_type, content, is_read, created_at')
       .single();
 
     if (messageError) throw messageError;
@@ -48,8 +48,9 @@ export async function POST(req: Request) {
       .eq('id', threadId);
 
     return NextResponse.json({ success: true, message });
-  } catch (err: any) {
-    console.error('Guest message API error:', err);
-    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
+  } catch (err: unknown) {
+    const error = err as Error;
+    console.error('Guest message API error:', error);
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
 }

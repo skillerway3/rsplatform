@@ -4,10 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { Zap, ShieldCheck, Clock, ArrowRight, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Zap, ShieldCheck, ArrowRight, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { cn } from '@/lib/utils';
-import Link from 'next/link';
 import { createNotification } from '@/lib/notifications';
 
 export default function SubmitRequestPage() {
@@ -61,7 +59,7 @@ export default function SubmitRequestPage() {
           status: 'open',
           expires_at: expiresAt.toISOString()
         })
-        .select()
+        .select('id')
         .single();
 
       if (submitError) {
@@ -107,9 +105,9 @@ export default function SubmitRequestPage() {
         // Fallback if router fails
         window.location.href = `/marketplace/requests/${data.id}`;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Submit request error:', err);
-      setError(err.message || 'Failed to submit request. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to submit request. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -139,8 +137,6 @@ export default function SubmitRequestPage() {
     <div className="min-h-screen bg-zinc-950 pt-32 pb-20 relative overflow-hidden">
       {/* Background Glows */}
       <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-amber-500/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-zinc-100/5 rounded-full blur-[120px]" />
       </div>
 
       <div className="container mx-auto px-6 relative z-10">

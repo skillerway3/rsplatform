@@ -2,23 +2,50 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { Search, Filter, SlidersHorizontal, Zap, Star, ChevronDown, LayoutGrid, List, X, Loader2 } from 'lucide-react';
+import { Search, SlidersHorizontal, Zap, LayoutGrid, List, X, Loader2, Package } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { motion, AnimatePresence } from 'motion/react';
 import { GAMES, CATEGORIES } from '@/data/mock';
-import { formatCurrency, cn, getListingSection } from '@/lib/utils';
-import { GameId, CategoryId, SectionId } from '@/types';
+import { formatCurrency, cn } from '@/lib/utils';
+import { GameId, CategoryId } from '@/types';
 import { SECTION_TO_CATEGORY, NAV_SECTIONS } from '@/data/navigation';
 import { AccountFilters } from '@/components/browse/AccountFilters';
 import { AccountListingCard } from '@/components/browse/AccountListingCard';
 import { BoostingSection } from '@/components/boosting/BoostingSection';
 import { ListingCard } from '@/components/ListingCard';
 import { supabase } from '@/lib/supabase';
+
+interface Seller {
+  id: string;
+  username: string;
+  avatar: string;
+  isVerified: boolean;
+  rating: number;
+  totalSales: number;
+  joinedAt: string;
+}
+
+interface Listing {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  game: string;
+  category: string;
+  seller_id: string;
+  created_at: string;
+  createdAt: string;
+  gameId: GameId;
+  categoryId: CategoryId;
+  sellerId: string;
+  deliveryTime: string;
+  deliveryMethod: string;
+  seller: Seller;
+}
 
 function BrowseContent() {
   const searchParams = useSearchParams();
@@ -28,9 +55,9 @@ function BrowseContent() {
   const gameParam = searchParams.get('game');
   const categoryParam = searchParams.get('category');
 
-  const [listings, setListings] = React.useState<any[]>([]);
+  const [listings, setListings] = React.useState<Listing[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
+  const [, setError] = React.useState<string | null>(null);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedGame, setSelectedGame] = React.useState<GameId | 'all'>('all');
   const [selectedCategory, setSelectedCategory] = React.useState<CategoryId | 'all'>('all');
@@ -49,9 +76,9 @@ function BrowseContent() {
 
   // Sync state with URL parameters and normalize legacy params
   React.useEffect(() => {
-    let currentSection = sectionParam;
-    let currentGame = gameParam;
-    let currentCategory = categoryParam;
+    const currentSection = sectionParam;
+    const currentGame = gameParam;
+    const currentCategory = categoryParam;
 
     // Legacy mapping
     const legacyMapping: Record<string, string> = {
@@ -94,7 +121,7 @@ function BrowseContent() {
       try {
         let query = supabase
           .from('listings')
-          .select('*')
+          .select('id, title, price, game, category, seller_id, created_at, description')
           .eq('status', 'active');
 
         if (selectedGame !== 'all') {
@@ -123,19 +150,20 @@ function BrowseContent() {
           const sellerIds = Array.from(new Set(listingsData.map(l => l.seller_id)));
           const { data: profilesData } = await supabase
             .from('profiles')
-            .select('id, username, avatar_url, is_verified_seller, average_rating, review_count')
+            .select('id, username, avatar_url, is_verified_seller, average_rating, review_count, created_at')
             .in('id', sellerIds);
 
           const profileMap = (profilesData || []).reduce((acc, p) => {
             acc[p.id] = p;
             return acc;
-          }, {} as Record<string, any>);
+          }, {} as Record<string, { username: string; avatar_url: string; is_verified_seller: boolean; average_rating: number; review_count: number; created_at: string }>);
 
           // Transform data
-          const transformedData = listingsData.map((item: any) => {
+          const transformedData = listingsData.map((item) => {
             const seller = profileMap[item.seller_id];
             return {
               ...item,
+              createdAt: item.created_at,
               gameId: item.game,
               categoryId: item.category,
               sellerId: item.seller_id,
@@ -148,17 +176,18 @@ function BrowseContent() {
                 isVerified: seller?.is_verified_seller || false,
                 rating: seller?.average_rating || 0,
                 totalSales: seller?.review_count || 0,
+                joinedAt: seller?.created_at || new Date().toISOString(),
               }
-            };
+            } as Listing;
           });
 
           setListings(transformedData);
         } else {
           setListings([]);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error fetching listings:', err);
-        setError(err.message);
+        setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
         setLoading(false);
       }
@@ -336,7 +365,7 @@ const isBoostingSection =
                       >
                         All Games
                       </button>
-                      {GAMES.map((game: any) => (
+                      {GAMES.map((game) => (
                         <button 
                           key={game.id}
                           onClick={() => handleGameSelect(game.id)}
@@ -363,7 +392,7 @@ const isBoostingSection =
                       >
                         All Categories
                       </button>
-                      {CATEGORIES.map((cat: any) => (
+                      {CATEGORIES.map((cat) => (
                         <button 
                           key={cat.id}
                           onClick={() => handleCategorySelect(cat.id)}
@@ -397,7 +426,7 @@ const isBoostingSection =
                       <Loader2 className="w-12 h-12 text-amber-500 animate-spin" />
                       <p className="text-zinc-500 font-black uppercase tracking-widest text-xs">Scanning Inventory...</p>
                     </div>
-                  ) : listings.map((listing: any, i: number) => (
+                  ) : listings.map((listing, i) => (
                     <motion.div
                       key={listing.id}
                       layout
@@ -412,14 +441,8 @@ const isBoostingSection =
                         <Link href={`/listing/${listing.id}`}>
                           <Card className="premium-card group overflow-hidden hover:border-amber-500/30 transition-all duration-300">
                             <div className="flex flex-col sm:flex-row h-full">
-                              <div className="w-full sm:w-48 h-48 sm:h-auto relative overflow-hidden shrink-0">
-                                <Image 
-                                  src={listing.images[0]} 
-                                  alt={listing.title} 
-                                  fill
-                                  className="object-cover transition-transform duration-700 group-hover:scale-110"
-                                  referrerPolicy="no-referrer"
-                                />
+                              <div className="w-full sm:w-48 h-48 sm:h-auto relative overflow-hidden shrink-0 bg-zinc-900 flex items-center justify-center">
+                                <Package className="w-8 h-8 text-zinc-800" />
                                 <div className="absolute top-3 left-3">
                                   <Badge variant="gold" className="text-[8px] font-black uppercase tracking-widest">
                                     {listing.gameId}
@@ -537,7 +560,7 @@ const isBoostingSection =
                       >
                         All Games
                       </button>
-                      {GAMES.map((game: any) => (
+                      {GAMES.map((game) => (
                         <button 
                           key={game.id}
                           onClick={() => handleGameSelect(game.id)}
@@ -564,7 +587,7 @@ const isBoostingSection =
                       >
                         All Categories
                       </button>
-                      {CATEGORIES.map((cat: any) => (
+                      {CATEGORIES.map((cat) => (
                         <button 
                           key={cat.id}
                           onClick={() => handleCategorySelect(cat.id)}

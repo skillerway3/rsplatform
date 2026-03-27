@@ -31,7 +31,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     if (!user) return;
     const { data, error } = await supabase
       .from('notifications')
-      .select('*')
+      .select('id, user_id, type, title, message, link, read, created_at')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -74,7 +74,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   const playNotificationSound = () => {
     try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
 

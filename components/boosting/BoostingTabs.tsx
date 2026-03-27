@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { BOOSTING_SERVICES } from '@/data/boosting/services';
 import { Zap, Package, Shield, Trophy, Star } from 'lucide-react';
 
-const ICON_MAP: Record<string, any> = {
+const ICON_MAP: Record<string, React.ElementType> = {
   Zap,
   Package,
   Shield,

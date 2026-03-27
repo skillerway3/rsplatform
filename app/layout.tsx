@@ -49,7 +49,7 @@ export default function RootLayout({
           <NotificationProvider>
             <PayPalProvider>
               <div className="relative flex min-h-screen flex-col">
-                <Suspense fallback={<div className="h-20 bg-zinc-950/50 backdrop-blur-xl border-b border-white/5" />}>
+                <Suspense fallback={<div className="h-20 bg-zinc-950 border-b border-white/5" />}>
                   <Navbar />
                 </Suspense>
                 <main className="flex-1">{children}</main>

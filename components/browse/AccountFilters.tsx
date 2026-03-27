@@ -14,13 +14,15 @@ const LOGIN_METHODS = ['Jagex Launcher', 'Legacy Login', 'Email Login', 'Manual 
 const TOTAL_LEVELS = ['3-31', '32-499', '500-999', '1000-1499', '1500-1999', '2000+'];
 
 interface AccountFiltersProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   filters: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setFilters: (filters: any) => void;
   onClear: () => void;
 }
 
 export function AccountFilters({ filters, setFilters, onClear }: AccountFiltersProps) {
-  const updateFilter = (key: string, value: any) => {
+  const updateFilter = (key: string, value: unknown) => {
     setFilters({ ...filters, [key]: value });
   };
 

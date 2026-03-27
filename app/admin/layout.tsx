@@ -13,16 +13,10 @@ import {
   AlertCircle, 
   History, 
   Search, 
-  Settings,
   Menu,
   X,
-  LogOut,
-  ChevronRight,
-  TrendingUp,
-  CreditCard,
   UserCheck
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
@@ -138,7 +132,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           isSidebarOpen ? "pl-64" : "pl-20"
         )}
       >
-        <header className="h-16 border-b border-white/5 bg-zinc-900/50 backdrop-blur-xl sticky top-0 z-40 px-8 flex items-center justify-between">
+        <header className="h-16 border-b border-white/5 bg-zinc-900 sticky top-0 z-40 px-8 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <h2 className="text-xs font-black text-white uppercase tracking-widest">
               {ADMIN_NAV.find(n => n.href === pathname)?.label || 'Administration'}
@@ -151,7 +145,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <Users className="w-3 h-3 text-amber-500" />
               </div>
               <span className="text-[10px] font-black text-white uppercase tracking-widest">
-                {profile?.username}
+                {String(profile?.username || '')}
               </span>
             </div>
             <Link href="/">

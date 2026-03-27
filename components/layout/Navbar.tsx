@@ -11,10 +11,11 @@ import { NAV_SECTIONS } from '@/data/navigation';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useNotifications } from '@/components/providers/NotificationProvider';
 import { NotificationDropdown } from '@/components/layout/NotificationDropdown';
+import Image from 'next/image';
 
 export function Navbar() {
   const { user, profile, signOut, isVerifiedSeller } = useAuth();
-  const { unreadCount } = useNotifications();
+  useNotifications();
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -54,7 +55,7 @@ export function Navbar() {
     <header
       className={cn(
         'fixed top-0 left-0 right-0 z-50 transition-all duration-500 py-6',
-        isScrolled ? 'bg-zinc-950/80 border-b border-white/5 py-4' : 'bg-transparent'
+        isScrolled ? 'bg-zinc-950 border-b border-white/5 py-4' : 'bg-transparent'
       )}
     >
       <div className="container mx-auto px-6 flex items-center justify-between">
@@ -100,7 +101,7 @@ export function Navbar() {
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.98 }}
                       transition={{ duration: 0.25, ease: "easeOut" }}
-                      className="absolute top-full left-1/2 -translate-x-1/2 mt-4 w-56 bg-zinc-950/90 border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden py-3 z-[60]"
+                      className="absolute top-full left-1/2 -translate-x-1/2 mt-4 w-56 bg-zinc-950 border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden py-3 z-[60]"
                     >
                       <div className="px-4 py-2 mb-2 border-b border-white/5">
                         <span className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.3em]">Select Game</span>
@@ -163,7 +164,7 @@ export function Navbar() {
               >
                 {profile?.avatar_url ? (
                   <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10">
-                    <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                    <Image src={profile.avatar_url} alt="Profile" fill className="object-cover" />
                   </div>
                 ) : (
                   <div className="w-8 h-8 rounded-lg bg-zinc-900 flex items-center justify-center border border-white/10">
@@ -179,7 +180,7 @@ export function Navbar() {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.98 }}
                     transition={{ duration: 0.25, ease: "easeOut" }}
-                    className="absolute top-full right-0 mt-4 w-64 bg-zinc-950/90 border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden py-3 z-[60]"
+                    className="absolute top-full right-0 mt-4 w-64 bg-zinc-950 border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden py-3 z-[60]"
                   >
                     {user ? (
                       <>
@@ -187,7 +188,7 @@ export function Navbar() {
                           <div className="flex items-center gap-3 mb-3">
                             <div className="w-10 h-10 rounded-xl overflow-hidden border border-white/10 bg-zinc-900 shrink-0">
                               {profile?.avatar_url ? (
-                                <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                                <Image src={profile.avatar_url} alt="Avatar" fill className="object-cover" />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center">
                                   <User className="w-5 h-5 text-zinc-600" />

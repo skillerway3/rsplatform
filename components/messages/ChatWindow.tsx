@@ -14,10 +14,9 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
-import { Message, User } from '@/types';
+import { User } from '@/types';
 
 interface ChatWindowProps {
-  selectedChat: Message;
   activeUser: User;
   isMobileListOpen: boolean;
   onBack: () => void;
@@ -27,7 +26,6 @@ interface ChatWindowProps {
 }
 
 export function ChatWindow({
-  selectedChat,
   activeUser,
   isMobileListOpen,
   onBack,
@@ -41,7 +39,7 @@ export function ChatWindow({
       isMobileListOpen && "hidden lg:flex"
     )}>
       {/* Chat Header */}
-      <header className="p-6 border-b border-white/5 flex items-center justify-between bg-zinc-900/50 backdrop-blur-xl">
+      <header className="p-6 border-b border-white/5 flex items-center justify-between bg-zinc-900">
         <div className="flex items-center space-x-6">
           <Button 
             variant="ghost" 

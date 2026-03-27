@@ -3,10 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Search, 
-  Filter, 
   HelpCircle,
   MessageSquare,
-  CheckCircle2,
   XCircle,
   Clock,
   User,
@@ -40,52 +38,52 @@ export default function AdminRequestsPage() {
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
 
   useEffect(() => {
+    const fetchRequests = async () => {
+      setLoading(true);
+      try {
+        let query = supabase
+          .from('requests')
+          .select('id, title, description, budget, status, created_at, user_id')
+          .order('created_at', { ascending: false });
+
+        if (statusFilter !== 'all') {
+          query = query.eq('status', statusFilter);
+        }
+
+        const { data: requestsData, error: requestsError } = await query;
+        if (requestsError) throw requestsError;
+
+        if (requestsData && requestsData.length > 0) {
+          // Fetch user profiles in parallel
+          const userIds = Array.from(new Set(requestsData.map(r => r.user_id)));
+          const { data: profilesData } = await supabase
+            .from('profiles')
+            .select('id, username')
+            .in('id', userIds);
+
+          const profileMap = (profilesData || []).reduce((acc, p) => {
+            acc[p.id] = p;
+            return acc;
+          }, {} as Record<string, { id: string; username: string }>);
+
+          const transformedRequests = requestsData.map(request => ({
+            ...request,
+            user: profileMap[request.user_id] || null
+          }));
+
+          setRequests(transformedRequests);
+        } else {
+          setRequests([]);
+        }
+      } catch (error: unknown) {
+        console.error('Error fetching requests:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchRequests();
   }, [statusFilter]);
-
-  const fetchRequests = async () => {
-    setLoading(true);
-    try {
-      let query = supabase
-        .from('requests')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
-      }
-
-      const { data: requestsData, error: requestsError } = await query;
-      if (requestsError) throw requestsError;
-
-      if (requestsData && requestsData.length > 0) {
-        // Fetch user profiles in parallel
-        const userIds = Array.from(new Set(requestsData.map(r => r.user_id)));
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('id, username')
-          .in('id', userIds);
-
-        const profileMap = (profilesData || []).reduce((acc, p) => {
-          acc[p.id] = p;
-          return acc;
-        }, {} as Record<string, any>);
-
-        const transformedRequests = requestsData.map(request => ({
-          ...request,
-          user: profileMap[request.user_id] || null
-        }));
-
-        setRequests(transformedRequests);
-      } else {
-        setRequests([]);
-      }
-    } catch (error) {
-      console.error('Error fetching requests:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleUpdateStatus = async (id: string, newStatus: Request['status']) => {
     setIsUpdating(id);
@@ -98,7 +96,7 @@ export default function AdminRequestsPage() {
       if (error) throw error;
       
       setRequests(requests.map(r => r.id === id ? { ...r, status: newStatus } : r));
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error updating status:', error);
     } finally {
       setIsUpdating(null);

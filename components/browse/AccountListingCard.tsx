@@ -1,14 +1,13 @@
 'use client';
 
 import React from 'react';
-import { Listing, User } from '@/types';
-import { Card, CardContent } from '@/components/ui/Card';
+import { Listing } from '@/types';
+import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { Shield, Clock, Package, Star, Zap, ChevronRight, CheckCircle2, Trophy, UserCheck } from 'lucide-react';
+import { Shield, Clock, Package, Star, ChevronRight, CheckCircle2, UserCheck } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { formatCurrency, cn } from '@/lib/utils';
-import { USERS } from '@/data/mock';
+import { formatCurrency } from '@/lib/utils';
 
 interface AccountListingCardProps {
   listing: Listing;

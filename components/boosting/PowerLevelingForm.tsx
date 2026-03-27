@@ -63,7 +63,7 @@ function CustomSkillSelect({ value, onChange }: { value: string, onChange: (val:
   }, [isOpen]);
 
   const selectedSkill = OSRS_SKILLS.find(s => s.id === value);
-  const IconComponent = (Icons as any)[selectedSkill?.icon || 'Sword'];
+  const IconComponent = (Icons as Record<string, React.ElementType>)[selectedSkill?.icon || 'Sword'];
 
   return (
     <div className="relative">
@@ -106,7 +106,7 @@ function CustomSkillSelect({ value, onChange }: { value: string, onChange: (val:
             >
               <div className="max-h-[400px] overflow-y-auto custom-scrollbar p-1">
               {OSRS_SKILLS.map((skill) => {
-                const SkillIcon = (Icons as any)[skill.icon || 'Sword'];
+                const SkillIcon = (Icons as Record<string, React.ElementType>)[skill.icon || 'Sword'];
                 const isSelected = skill.id === value;
                 return (
                   <button
@@ -150,7 +150,7 @@ export function PowerLevelingForm({ onUpdate }: PowerLevelingFormProps) {
   const [additionalInfo, setAdditionalInfo] = useState('');
   const [files, setFiles] = useState<File[]>([]);
 
-  const updateRow = (id: string, field: keyof SkillRow, value: any) => {
+  const updateRow = (id: string, field: keyof SkillRow, value: string | number) => {
     let finalValue = value;
     if (field === 'currentLevel' || field === 'desiredLevel') {
       finalValue = Math.max(1, Math.min(99, value || 1));
@@ -210,8 +210,6 @@ export function PowerLevelingForm({ onUpdate }: PowerLevelingFormProps) {
           <div className="space-y-4">
             {rows.map((row, index) => {
               const error = getRowError(row);
-              const skill = OSRS_SKILLS.find(s => s.id === row.skillId);
-              const IconComponent = (Icons as any)[skill?.icon || 'Sword'];
 
               return (
                 <div key={row.id} className="group relative space-y-2" style={{ zIndex: rows.length - index }}>

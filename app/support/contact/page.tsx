@@ -8,14 +8,12 @@ import {
   Send, 
   ShieldCheck, 
   ChevronRight,
-  Zap,
   CheckCircle2,
   AlertCircle,
   X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/Button';
-import { cn } from '@/lib/utils';
 
 export default function ContactPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -61,7 +59,7 @@ export default function ContactPage() {
         setIsSuccess(false);
         setFormData({ name: '', email: '', subject: '', message: '' });
       }, 3000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Support error:', error);
       setError(error.message || 'Failed to send message. Please try again.');
     } finally {

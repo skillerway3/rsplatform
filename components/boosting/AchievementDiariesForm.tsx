@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { Check, Info, Upload, FileText, Trash2 } from 'lucide-react';
+import { Check, Upload, FileText, Trash2 } from 'lucide-react';
 import { OSRS_DIARY_REGIONS, OSRS_DIARY_DIFFICULTIES } from '@/data/boosting/osrs-diaries';
 import { AccountTypeSelector } from './AccountTypeSelector';
 

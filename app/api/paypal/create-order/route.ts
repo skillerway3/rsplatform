@@ -87,9 +87,10 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ orderID });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const error = err as Error;
     return NextResponse.json(
-      { error: err?.message || "Server error" },
+      { error: error?.message || "Server error" },
       { status: 500 }
     );
   }

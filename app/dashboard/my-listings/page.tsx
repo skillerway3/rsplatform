@@ -3,7 +3,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { motion, AnimatePresence } from 'motion/react';
 import { 
   PlusCircle, 
   Tag, 
@@ -12,18 +11,16 @@ import {
   Eye, 
   PauseCircle, 
   PlayCircle,
-  CheckCircle2,
   AlertCircle,
   Loader2,
   ArrowLeft,
-  Search,
-  Filter,
-  DollarSign
+  Search
 } from 'lucide-react';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
 import { Button } from '@/components/ui/Button';
 
 interface Listing {
@@ -45,6 +42,7 @@ export default function MyListingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'paused' | 'sold'>('all');
+  const [listingToDelete, setListingToDelete] = useState<string | null>(null);
 
   const fetchListings = useCallback(async () => {
     if (!user) return;
@@ -58,9 +56,9 @@ export default function MyListingsPage() {
 
       if (error) throw error;
       setListings(data || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching listings:', err);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : 'Failed to fetch listings');
     } finally {
       setLoading(false);
     }
@@ -84,14 +82,13 @@ export default function MyListingsPage() {
 
       if (error) throw error;
       setListings(prev => prev.map(l => l.id === id ? { ...l, status } : l));
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error updating status:', err);
-      alert('Failed to update status');
+      setError('Failed to update status');
     }
   };
 
   const handleDeleteListing = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this listing? This action cannot be undone.')) return;
     try {
       const { error } = await supabase
         .from('listings')
@@ -100,9 +97,10 @@ export default function MyListingsPage() {
 
       if (error) throw error;
       setListings(prev => prev.filter(l => l.id !== id));
-    } catch (err: any) {
+      setListingToDelete(null);
+    } catch (err: unknown) {
       console.error('Error deleting listing:', err);
-      alert('Failed to delete listing');
+      setError('Failed to delete listing');
     }
   };
 
@@ -143,7 +141,7 @@ export default function MyListingsPage() {
     <div className="min-h-screen pt-32 pb-20 bg-zinc-950 relative overflow-hidden">
       {/* Background Glows - Simplified for performance */}
       <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-[-5%] left-[-5%] w-[20%] h-[20%] bg-amber-500/5 rounded-full blur-[60px]" />
+        <div className="absolute top-[-10%] left-[-10%] w-[30%] h-[30%] bg-amber-500/5 rounded-full blur-[80px]" />
       </div>
 
       <div className="container mx-auto px-6 relative z-10">
@@ -267,7 +265,7 @@ export default function MyListingsPage() {
                         </button>
                       )}
                       <button 
-                        onClick={() => handleDeleteListing(listing.id)}
+                        onClick={() => setListingToDelete(listing.id)}
                         className="w-11 h-11 bg-zinc-950 border border-white/5 rounded-xl flex items-center justify-center text-zinc-500 hover:text-red-500 hover:bg-red-500/5 transition-all" 
                         title="Delete Listing"
                       >
@@ -292,6 +290,16 @@ export default function MyListingsPage() {
           )}
         </div>
       </div>
+
+      <ConfirmationModal
+        isOpen={!!listingToDelete}
+        onClose={() => setListingToDelete(null)}
+        onConfirm={() => listingToDelete && handleDeleteListing(listingToDelete)}
+        title="Delete Listing"
+        message="Are you sure you want to delete this listing? This action cannot be undone."
+        confirmText="Delete Listing"
+        variant="danger"
+      />
     </div>
   );
 }

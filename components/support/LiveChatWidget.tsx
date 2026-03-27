@@ -10,8 +10,6 @@ import {
   ChevronRight, 
   HelpCircle,
   ShieldCheck,
-  Clock,
-  CheckCircle2,
   AlertCircle,
   Loader2,
   ArrowLeft
@@ -20,7 +18,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/Button';
 import { createClient } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
-import Image from 'next/image';
 import { useAuth } from '@/components/auth/AuthProvider';
 
 interface Message {
@@ -125,16 +122,30 @@ export function LiveChatWidget() {
         table: 'support_messages',
         filter: `thread_id=eq.${threadId}`
       }, async (payload) => {
+        if (!payload.new || !payload.new.id) return;
+        
         const { data: newMessage } = await supabase
           .from('support_messages')
-          .select(`*, sender:profiles!sender_id(username, avatar_url)`)
+          .select('id, sender_id, content, sender_type, is_read, created_at')
           .eq('id', payload.new.id)
           .single();
         
         if (newMessage) {
+          // Fetch sender profile separately to avoid nested query syntax
+          const { data: senderProfile } = await supabase
+            .from('profiles')
+            .select('username, avatar_url')
+            .eq('id', newMessage.sender_id)
+            .single();
+
+          const messageWithSender = {
+            ...newMessage,
+            sender: senderProfile || undefined
+          };
+
           setMessages(prev => {
             if (prev.find(m => m.id === newMessage.id)) return prev;
-            return [...prev, newMessage];
+            return [...prev, messageWithSender];
           });
         }
       })
@@ -143,7 +154,7 @@ export function LiveChatWidget() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [threadId, step]);
+  }, [threadId, step, supabase]);
 
   const resetChat = () => {
     setStep('welcome');
@@ -197,7 +208,7 @@ export function LiveChatWidget() {
             priority: 'medium',
             status: 'open'
           })
-          .select()
+          .select('id')
           .single();
 
         if (threadError) throw threadError;
@@ -208,13 +219,35 @@ export function LiveChatWidget() {
       
       // Fetch messages
       if (user) {
-        const { data: msgs } = await supabase
+        const { data: msgs, error: msgsError } = await supabase
           .from('support_messages')
-          .select(`*, sender:profiles!sender_id(username, avatar_url)`)
+          .select('id, sender_id, content, sender_type, is_read, created_at')
           .eq('thread_id', currentThreadId)
           .order('created_at', { ascending: true });
 
-        setMessages(msgs || []);
+        if (msgsError) throw msgsError;
+
+        if (msgs && msgs.length > 0) {
+          const senderIds = Array.from(new Set(msgs.map(m => m.sender_id)));
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_url')
+            .in('id', senderIds);
+
+          const profileMap = (profiles || []).reduce((acc: Record<string, Message['sender']>, p) => {
+            acc[p.id] = p;
+            return acc;
+          }, {});
+
+          const msgsWithSender = msgs.map(m => ({
+            ...m,
+            sender: profileMap[m.sender_id]
+          }));
+
+          setMessages(msgsWithSender);
+        } else {
+          setMessages([]);
+        }
       } else {
         // Use RPC for guest messages
         const { data: msgs, error: msgsError } = await supabase.rpc('get_guest_messages', {
@@ -225,7 +258,7 @@ export function LiveChatWidget() {
         if (msgsError) throw msgsError;
         
         // Transform RPC output to match message format
-        const transformedMsgs = msgs?.map((m: any) => ({
+        const transformedMsgs = (msgs as Record<string, unknown>[])?.map((m: Record<string, unknown>) => ({
           ...m,
           sender: {
             username: m.sender_username,
@@ -340,7 +373,7 @@ export function LiveChatWidget() {
                     <div className="space-y-2">
                       <h3 className="text-xl font-black text-white uppercase tracking-tighter">RSPlatform Support</h3>
                       <p className="text-zinc-500 text-[11px] font-medium leading-relaxed max-w-[200px] mx-auto">
-                        Welcome! I'm your virtual assistant. How can we help you today?
+                        Welcome! I&apos;m your virtual assistant. How can we help you today?
                       </p>
                     </div>
                     <Button 

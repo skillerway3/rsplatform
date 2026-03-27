@@ -1,11 +1,10 @@
 import Link from 'next/link';
-import { ShieldCheck, Twitter, Github, Instagram, Mail } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 
 export function Footer() {
   return (
     <footer className="bg-zinc-950 border-t border-white/5 pt-32 pb-16 relative overflow-hidden">
-      {/* Background Glow */}
-      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-amber-500/5 blur-[120px] rounded-full pointer-events-none opacity-50"></div>
+      {/* Background Glow removed for performance */}
 
       <div className="container mx-auto px-6 relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-16 mb-24">

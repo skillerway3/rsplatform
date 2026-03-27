@@ -10,7 +10,7 @@ interface SellerCardProps {
 
 export function SellerCard({ seller }: SellerCardProps) {
   return (
-    <Card className="border-zinc-800/50 bg-zinc-900/30 backdrop-blur-xl rounded-[2.5rem] overflow-hidden group shadow-2xl">
+    <Card className="border-zinc-800/50 bg-zinc-900 rounded-[2.5rem] overflow-hidden group shadow-2xl">
       <CardContent className="p-10">
         <div className="flex items-center space-x-6 mb-10">
           <div className="relative">

@@ -3,11 +3,9 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { ShieldCheck, Clock, Zap, MessageSquare, CheckCircle2, AlertCircle, Loader2, ArrowRight, Filter } from 'lucide-react';
+import { ShieldCheck, Zap, Loader2, ArrowRight, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { cn } from '@/lib/utils';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 
 interface Request {
   id: string;
@@ -22,27 +20,26 @@ interface Request {
 }
 
 export default function MarketplaceRequestsPage() {
-  const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
+  const { loading: authLoading } = useAuth();
   const [requests, setRequests] = useState<Request[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchRequests = async () => {
       try {
         const { data, error } = await supabase
           .from('buyer_requests')
-          .select('*')
+          .select('id, title, description, status, created_at, expires_at, game, category, buyer_id')
           .eq('status', 'open')
           .gt('expires_at', new Date().toISOString())
           .order('created_at', { ascending: false });
 
         if (error) throw error;
         setRequests(data || []);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error fetching requests:', err);
-        setError(err.message);
+        setError(err instanceof Error ? err.message : 'An unknown error occurred');
       } finally {
         setLoading(false);
       }

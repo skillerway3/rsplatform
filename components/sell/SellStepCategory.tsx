@@ -24,7 +24,7 @@ export function SellStepCategory({ formData, updateFormData }: SellStepCategoryP
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {GAMES.map((game) => {
-            const Icon = (LucideIcons as any)[game.icon] || LucideIcons.Gamepad2;
+            const Icon = (LucideIcons as Record<string, React.ElementType>)[game.icon] || LucideIcons.Gamepad2;
             const isSelected = formData.gameId === game.id;
             
             return (
@@ -66,7 +66,7 @@ export function SellStepCategory({ formData, updateFormData }: SellStepCategoryP
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {CATEGORIES.map((category) => {
-            const Icon = (LucideIcons as any)[category.icon] || LucideIcons.Package;
+            const Icon = (LucideIcons as Record<string, React.ElementType>)[category.icon] || LucideIcons.Package;
             const isSelected = formData.categoryId === category.id;
             
             return (

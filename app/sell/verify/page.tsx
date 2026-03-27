@@ -28,8 +28,8 @@ export default function SellerVerifyPage() {
     selfie: null,
   });
 
-  const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -40,7 +40,7 @@ export default function SellerVerifyPage() {
 
     const checkStatus = async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error: fetchError } = await supabase
           .from('seller_verifications')
           .select('status, rejection_reason')
           .eq('user_id', user.id)
@@ -48,8 +48,12 @@ export default function SellerVerifyPage() {
           .limit(1)
           .maybeSingle();
 
+        if (fetchError) {
+          console.error('Error fetching verification status:', fetchError);
+        }
+
         if (data) {
-          setStatus(data.status as any);
+          setStatus(data.status as 'not_started' | 'pending' | 'approved' | 'rejected');
           setRejectionReason(data.rejection_reason);
         }
       } catch (err) {
@@ -143,7 +147,7 @@ export default function SellerVerifyPage() {
       setTimeout(() => {
         router.replace('/sell/verify/pending');
       }, 1500);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error submitting verification:', err);
       setError('Failed to submit verification. Please try again later or contact support if the issue persists.');
     } finally {
@@ -244,7 +248,7 @@ export default function SellerVerifyPage() {
 
           <form onSubmit={handleSubmit} className="space-y-12">
             {/* Phone Number */}
-            <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-10 backdrop-blur-xl space-y-8">
+            <div className="bg-zinc-900 border border-zinc-800/50 rounded-[2.5rem] p-10 space-y-8">
               <div className="space-y-3">
                 <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em] ml-1">Phone Number</label>
                 <input 
@@ -259,7 +263,7 @@ export default function SellerVerifyPage() {
             </div>
 
             {/* Document Type */}
-            <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-10 backdrop-blur-xl space-y-8">
+            <div className="bg-zinc-900 border border-zinc-800/50 rounded-[2.5rem] p-10 space-y-8">
               <div className="space-y-4">
                 <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em] ml-1">Document Type</label>
                 <div className="grid grid-cols-3 gap-4">
@@ -285,7 +289,7 @@ export default function SellerVerifyPage() {
             {/* Document Uploads */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* ID Front */}
-              <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-8 backdrop-blur-xl flex flex-col items-center text-center space-y-6">
+              <div className="bg-zinc-900 border border-zinc-800/50 rounded-[2.5rem] p-8 flex flex-col items-center text-center space-y-6">
                 <div className="w-16 h-16 bg-zinc-950 rounded-2xl flex items-center justify-center border border-white/5">
                   <FileText className="w-8 h-8 text-zinc-700" />
                 </div>
@@ -305,7 +309,7 @@ export default function SellerVerifyPage() {
               </div>
 
               {/* ID Back */}
-              <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-8 backdrop-blur-xl flex flex-col items-center text-center space-y-6">
+              <div className="bg-zinc-900 border border-zinc-800/50 rounded-[2.5rem] p-8 flex flex-col items-center text-center space-y-6">
                 <div className="w-16 h-16 bg-zinc-950 rounded-2xl flex items-center justify-center border border-white/5">
                   <FileText className="w-8 h-8 text-zinc-700" />
                 </div>
@@ -325,7 +329,7 @@ export default function SellerVerifyPage() {
               </div>
 
               {/* Selfie */}
-              <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-[2.5rem] p-8 backdrop-blur-xl flex flex-col items-center text-center space-y-6 md:col-span-2">
+              <div className="bg-zinc-900 border border-zinc-800/50 rounded-[2.5rem] p-8 flex flex-col items-center text-center space-y-6 md:col-span-2">
                 <div className="w-16 h-16 bg-zinc-950 rounded-2xl flex items-center justify-center border border-white/5">
                   <Camera className="w-8 h-8 text-zinc-700" />
                 </div>

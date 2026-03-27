@@ -3,16 +3,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { motion } from 'motion/react';
 import { 
-  Clock, 
-  DollarSign, 
-  ShieldCheck, 
   AlertCircle,
-  CheckCircle2,
-  XCircle,
-  MessageSquare,
-  Zap,
   Loader2,
   ArrowLeft,
   Tag
@@ -25,7 +17,7 @@ import { Button } from '@/components/ui/Button';
 
 interface Offer {
   id: string;
-  buyer_request_id: string;
+  request_id: string;
   price: number;
   delivery_time: string;
   message: string;
@@ -38,22 +30,8 @@ interface Offer {
     buyer: {
       username: string;
       avatar_url: string;
-    } | {
-      username: string;
-      avatar_url: string;
-    }[];
-  } | {
-    title: string;
-    game: string;
-    category: string;
-    buyer: {
-      username: string;
-      avatar_url: string;
-    } | {
-      username: string;
-      avatar_url: string;
-    }[];
-  }[];
+    };
+  } | null;
 }
 
 export default function MyOffersPage() {
@@ -67,10 +45,9 @@ export default function MyOffersPage() {
     if (!user) return;
     try {
       setLoading(true);
-      // Simplified query: Fetch offers first, then related data manually to avoid nested joins
       const { data: offersData, error: offersError } = await supabase
         .from('buyer_request_offers')
-        .select('id, buyer_request_id, price, delivery_time, message, status, created_at')
+        .select('id, request_id, price, delivery_time, message, status, created_at')
         .eq('seller_id', user.id)
         .order('created_at', { ascending: false });
 
@@ -80,8 +57,7 @@ export default function MyOffersPage() {
         return;
       }
 
-      // Fetch related requests and buyers in parallel
-      const requestIds = Array.from(new Set(offersData.map(o => o.buyer_request_id).filter(Boolean)));
+      const requestIds = Array.from(new Set(offersData.map(o => o.request_id).filter(Boolean)));
       
       const { data: requestsData, error: requestsError } = await supabase
         .from('buyer_requests')
@@ -96,28 +72,30 @@ export default function MyOffersPage() {
         .select('id, username, avatar_url')
         .in('id', buyerIds);
 
-      // Map everything back together
       const enrichedOffers = offersData.map(offer => {
-        const req = requestsData?.find(r => r.id === offer.buyer_request_id);
+        const req = requestsData?.find(r => r.id === offer.request_id);
         const buyer = buyersData?.find(b => b.id === req?.buyer_id);
         
         return {
           ...offer,
           request: req ? {
-            ...req,
+            title: req.title,
+            game: req.game,
+            category: req.category,
             buyer: buyer || { username: 'Unknown', avatar_url: '' }
           } : null
         };
       });
 
-      setOffers(enrichedOffers as any);
-    } catch (err: any) {
+      setOffers(enrichedOffers as Offer[]);
+    } catch (err: unknown) {
       console.error('Error fetching offers:', err);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : 'Failed to fetch offers');
     } finally {
       setLoading(false);
     }
   }, [user]);
+
 
   useEffect(() => {
     if (authLoading) return;
@@ -190,23 +168,23 @@ export default function MyOffersPage() {
                         {offer.status}
                       </div>
                       <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">
-                        {Array.isArray(offer.request) ? offer.request[0]?.game : offer.request?.game} • {Array.isArray(offer.request) ? offer.request[0]?.category : offer.request?.category}
+                        {offer.request?.game} • {offer.request?.category}
                       </span>
                     </div>
                     <h3 className="text-xl font-black text-white uppercase tracking-tight mb-2 group-hover:text-amber-500 transition-colors">
-                      {Array.isArray(offer.request) ? offer.request[0]?.title : offer.request?.title}
+                      {offer.request?.title}
                     </h3>
                     <div className="flex items-center gap-3">
                       <div className="relative w-6 h-6 rounded-full overflow-hidden border border-white/10">
                         <Image 
-                          src={(Array.isArray(offer.request) ? (Array.isArray(offer.request[0]?.buyer) ? offer.request[0].buyer[0]?.avatar_url : offer.request[0].buyer?.avatar_url) : (Array.isArray(offer.request?.buyer) ? offer.request.buyer[0]?.avatar_url : offer.request?.buyer?.avatar_url)) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${Array.isArray(offer.request) ? (Array.isArray(offer.request[0]?.buyer) ? offer.request[0].buyer[0]?.username : offer.request[0].buyer?.username) : (Array.isArray(offer.request?.buyer) ? offer.request.buyer[0]?.username : offer.request?.buyer?.username)}`}
-                          alt={Array.isArray(offer.request) ? (Array.isArray(offer.request[0]?.buyer) ? offer.request[0].buyer[0]?.username : offer.request[0].buyer?.username) : (Array.isArray(offer.request?.buyer) ? offer.request.buyer[0]?.username : offer.request?.buyer?.username) || 'User'}
+                          src={offer.request?.buyer?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${offer.request?.buyer?.username}`}
+                          alt={offer.request?.buyer?.username || 'User'}
                           fill
                           className="object-cover"
                         />
                       </div>
                       <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
-                        For {Array.isArray(offer.request) ? (Array.isArray(offer.request[0]?.buyer) ? offer.request[0].buyer[0]?.username : offer.request[0].buyer?.username) : (Array.isArray(offer.request?.buyer) ? offer.request.buyer[0]?.username : offer.request?.buyer?.username)}
+                        For {offer.request?.buyer?.username}
                       </span>
                     </div>
                   </div>
@@ -224,7 +202,7 @@ export default function MyOffersPage() {
                       <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Sent On</p>
                       <p className="text-sm font-black text-white">{formatDate(offer.created_at)}</p>
                     </div>
-                    <Link href={`/marketplace/request/${offer.buyer_request_id}`}>
+                    <Link href={`/marketplace/request/${offer.request_id}`}>
                       <Button variant="outline" size="sm" className="rounded-xl text-[9px] font-black uppercase tracking-widest h-10 px-6">
                         View Request
                       </Button>

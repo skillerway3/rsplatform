@@ -1,6 +1,7 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-let supabaseAdminClient: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let supabaseAdminClient: SupabaseClient<any> | null = null;
 
 export const getSupabaseAdmin = () => {
   if (supabaseAdminClient) return supabaseAdminClient;
@@ -12,12 +13,13 @@ export const getSupabaseAdmin = () => {
     throw new Error('Missing Supabase environment variables for admin client');
   }
 
-  supabaseAdminClient = createClient(supabaseUrl, supabaseServiceKey, {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabaseAdminClient = createClient<any>(supabaseUrl, supabaseServiceKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false
     }
   });
 
-  return supabaseAdminClient;
+  return supabaseAdminClient!;
 };

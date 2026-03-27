@@ -6,10 +6,8 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Bell, 
-  CheckCircle2, 
   AlertCircle, 
   MessageSquare, 
-  Zap, 
   Clock, 
   Trash2, 
   CheckSquare,
@@ -43,7 +41,7 @@ export default function NotificationsPage() {
       try {
         const { data, error } = await supabase
           .from('notifications')
-          .select('*')
+          .select('id, type, title, content, link, is_read, created_at')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
 

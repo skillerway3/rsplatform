@@ -38,7 +38,7 @@ export function SellPreview({ formData, gameName, categoryName }: SellPreviewPro
         <Badge variant="outline" className="border-amber-500/30 text-amber-500 bg-amber-500/5">Draft</Badge>
       </div>
       
-      <Card className="overflow-hidden border-zinc-800 bg-zinc-900/50 backdrop-blur-sm group">
+      <Card className="overflow-hidden border-zinc-800 bg-zinc-900 group">
         <div className="aspect-[4/3] relative bg-zinc-800/50 overflow-hidden">
           {formData.images.length > 0 ? (
             <Image
@@ -55,22 +55,22 @@ export function SellPreview({ formData, gameName, categoryName }: SellPreviewPro
           )}
           <div className="absolute top-3 left-3 flex flex-col gap-2">
             {gameName && (
-              <Badge className="bg-black/60 backdrop-blur-md border-white/10 text-white font-medium">
+              <Badge className="bg-black/80 border-white/10 text-white font-medium">
                 {gameName}
               </Badge>
             )}
             {categoryName && (
-              <Badge className="bg-amber-500/80 backdrop-blur-md border-none text-black font-bold">
+              <Badge className="bg-amber-500 border-none text-black font-bold">
                 {categoryName}
               </Badge>
             )}
           </div>
           {isAccount && metadata?.build && (
             <div className="absolute bottom-3 left-3 right-3 flex flex-wrap gap-1.5">
-              <Badge className="bg-zinc-950/80 backdrop-blur-md border-white/10 text-amber-500 text-[10px] uppercase tracking-tighter">
+              <Badge className="bg-zinc-950 border-white/10 text-amber-500 text-[10px] uppercase tracking-tighter">
                 {metadata.build}
               </Badge>
-              <Badge className="bg-zinc-950/80 backdrop-blur-md border-white/10 text-zinc-300 text-[10px] uppercase tracking-tighter">
+              <Badge className="bg-zinc-950 border-white/10 text-zinc-300 text-[10px] uppercase tracking-tighter">
                 {metadata.type}
               </Badge>
             </div>

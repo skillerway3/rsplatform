@@ -1,13 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
-import { ShieldCheck, Zap } from 'lucide-react';
+import { ShieldCheck, Zap, Package } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Listing } from '@/types';
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 
 interface ListingCardProps {
   listing: Listing;
@@ -24,14 +23,8 @@ export function ListingCard({ listing, index = 0 }: ListingCardProps) {
     >
       <Link href={`/listing/${listing.id}`}>
         <Card className="premium-card group overflow-hidden h-full">
-          <div className="aspect-video relative overflow-hidden">
-            <Image 
-              src={listing.images[0]} 
-              alt={listing.title} 
-              fill
-              className="object-cover transition-transform duration-700 group-hover:scale-110"
-              referrerPolicy="no-referrer"
-            />
+          <div className="aspect-video relative overflow-hidden bg-zinc-900 flex items-center justify-center">
+            <Package className="w-12 h-12 text-zinc-800" />
             <div className="absolute top-4 left-4 flex flex-col gap-2">
               <div className="bg-zinc-950/80 px-3 py-1 rounded-lg border border-white/5 text-[9px] font-black uppercase tracking-widest text-amber-500 w-fit">
                 {listing.gameId}

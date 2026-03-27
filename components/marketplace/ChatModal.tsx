@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Send, Loader2, User, ShieldCheck, Clock, Zap, AlertCircle } from 'lucide-react';
+import { X, Send, Loader2, User, ShieldCheck, Clock, Zap } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Button } from '@/components/ui/Button';
@@ -51,7 +51,7 @@ export function ChatModal({ isOpen, onClose, requestId, sellerId, buyerId, title
         if (profile) setOtherUser(profile);
 
         // 1. Get or create thread
-        let { data: thread, error: threadError } = await supabase
+        const { data: thread, error: threadError } = await supabase
           .from('buyer_request_threads')
           .select('id')
           .eq('request_id', requestId)
@@ -69,7 +69,7 @@ export function ChatModal({ isOpen, onClose, requestId, sellerId, buyerId, title
               buyer_id: buyerId,
               seller_id: sellerId
             })
-            .select()
+            .select('id')
             .single();
 
           if (createError) throw createError;
@@ -82,7 +82,7 @@ export function ChatModal({ isOpen, onClose, requestId, sellerId, buyerId, title
           // 2. Fetch messages
           const { data: msgs, error: msgsError } = await supabase
             .from('buyer_request_messages')
-            .select('*')
+            .select('id, thread_id, sender_id, message, created_at, read_at')
             .eq('thread_id', thread.id)
             .order('created_at', { ascending: true });
 
@@ -154,7 +154,7 @@ export function ChatModal({ isOpen, onClose, requestId, sellerId, buyerId, title
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-zinc-950/80 backdrop-blur-sm z-[100]"
+            className="fixed inset-0 bg-zinc-950/90 z-[100]"
           />
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -163,7 +163,7 @@ export function ChatModal({ isOpen, onClose, requestId, sellerId, buyerId, title
             className="fixed inset-x-4 bottom-4 top-20 md:inset-auto md:right-8 md:bottom-8 md:top-auto md:w-[450px] md:h-[600px] bg-zinc-900 border border-zinc-800 rounded-[2.5rem] shadow-2xl z-[101] flex flex-col overflow-hidden"
           >
             {/* Header */}
-            <div className="p-6 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/50 backdrop-blur-xl">
+            <div className="p-6 border-b border-zinc-800 flex items-center justify-between bg-zinc-900">
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 rounded-2xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20">
                   <User className="w-5 h-5 text-amber-500" />
@@ -249,7 +249,7 @@ export function ChatModal({ isOpen, onClose, requestId, sellerId, buyerId, title
             {/* Input */}
             <form 
               onSubmit={handleSendMessage}
-              className="p-6 border-t border-zinc-800 bg-zinc-900/50 backdrop-blur-xl"
+              className="p-6 border-t border-zinc-800 bg-zinc-900"
             >
               <div className="relative flex items-center gap-3">
                 <input 

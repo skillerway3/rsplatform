@@ -2,21 +2,10 @@
 
 import React from 'react';
 import { 
-  ShoppingBag, 
   Search, 
-  Filter, 
-  MoreVertical, 
-  ChevronRight,
-  Calendar,
   DollarSign,
-  Package,
-  Truck,
-  CheckCircle,
-  Clock,
-  AlertCircle,
   ArrowRight,
-  ExternalLink,
-  Tag
+  Package
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
@@ -24,18 +13,41 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
+interface Order {
+  id: string;
+  order_code: string | null;
+  buyer_id: string;
+  seller_id: string;
+  listing_id: string;
+  total_price: number;
+  status: string;
+  created_at: string;
+  buyer?: {
+    username: string;
+    avatar_url: string | null;
+  };
+  seller?: {
+    username: string;
+    avatar_url: string | null;
+  };
+  listing?: {
+    title: string;
+    price: number;
+  };
+}
+
 export default function AdminOrdersPage() {
-  const supabase = createClient();
-  const [orders, setOrders] = React.useState<any[]>([]);
+  const [orders, setOrders] = React.useState<Order[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [filter, setFilter] = React.useState<'all' | 'pending' | 'completed' | 'cancelled' | 'disputed'>('all');
 
   React.useEffect(() => {
+    const supabase = createClient();
     async function fetchOrders() {
       setLoading(true);
       try {
-        let query = supabase.from('orders').select('*').order('created_at', { ascending: false });
+        let query = supabase.from('orders').select('id, order_code, buyer_id, seller_id, listing_id, total_price, status, created_at, paypal_order_id').order('created_at', { ascending: false });
 
         if (filter === 'pending') query = query.eq('status', 'pending');
         if (filter === 'completed') query = query.eq('status', 'completed');
@@ -53,18 +65,18 @@ export default function AdminOrdersPage() {
 
           const [profilesResponse, listingsResponse] = await Promise.all([
             supabase.from('profiles').select('id, username, avatar_url').in('id', [...new Set([...buyerIds, ...sellerIds])]),
-            supabase.from('listings').select('id, title, price, image_url').in('id', listingIds)
+            supabase.from('listings').select('id, title, price').in('id', listingIds)
           ]);
 
           const profileMap = (profilesResponse.data || []).reduce((acc, p) => {
             acc[p.id] = p;
             return acc;
-          }, {} as Record<string, any>);
+          }, {} as Record<string, { username: string; avatar_url: string | null }>);
 
           const listingMap = (listingsResponse.data || []).reduce((acc, l) => {
             acc[l.id] = l;
             return acc;
-          }, {} as Record<string, any>);
+          }, {} as Record<string, { title: string; price: number }>);
 
           const transformedOrders = ordersData.map(order => ({
             ...order,
@@ -77,7 +89,7 @@ export default function AdminOrdersPage() {
         } else {
           setOrders([]);
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Error fetching orders:', error);
       } finally {
         setLoading(false);
@@ -179,13 +191,8 @@ export default function AdminOrdersPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center space-x-3">
-                        <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-white/10 bg-zinc-950">
-                          <Image 
-                            src={order.listing?.image_url || 'https://picsum.photos/seed/listing/100/100'}
-                            alt={order.listing?.title}
-                            fill
-                            className="object-cover"
-                          />
+                        <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-white/10 bg-zinc-950 flex items-center justify-center text-zinc-600">
+                          <Package className="w-4 h-4" />
                         </div>
                         <div className="max-w-[150px]">
                           <p className="text-[10px] font-black text-white uppercase tracking-widest truncate">{order.listing?.title}</p>
@@ -199,26 +206,26 @@ export default function AdminOrdersPage() {
                           <div className="w-6 h-6 rounded-full overflow-hidden border border-white/10 bg-zinc-950 mb-1">
                             <Image 
                               src={order.buyer?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${order.buyer_id}`}
-                              alt={order.buyer?.username}
+                              alt={order.buyer?.username || 'Buyer'}
                               width={24}
                               height={24}
                               className="object-cover"
                             />
                           </div>
-                          <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">{order.buyer?.username}</span>
+                          <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">{order.buyer?.username || 'Unknown'}</span>
                         </div>
                         <ArrowRight className="w-3 h-3 text-zinc-700" />
                         <div className="flex flex-col items-center">
                           <div className="w-6 h-6 rounded-full overflow-hidden border border-white/10 bg-zinc-950 mb-1">
                             <Image 
                               src={order.seller?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${order.seller_id}`}
-                              alt={order.seller?.username}
+                              alt={order.seller?.username || 'Seller'}
                               width={24}
                               height={24}
                               className="object-cover"
                             />
                           </div>
-                          <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">{order.seller?.username}</span>
+                          <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">{order.seller?.username || 'Unknown'}</span>
                         </div>
                       </div>
                     </td>

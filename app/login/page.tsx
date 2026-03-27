@@ -6,19 +6,17 @@ import { useRouter } from 'next/navigation';
 import { 
   ShieldCheck, 
   Lock, 
-  Mail, 
   ArrowRight, 
-  Github, 
   Chrome, 
   ChevronLeft,
-  Zap,
   CheckCircle2,
-  Loader2
+  Loader2,
+  Zap
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Card, CardContent } from '@/components/ui/Card';
+import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
-import { motion } from 'motion/react';
+
 import { supabase } from '@/lib/supabase';
 
 export default function LoginPage() {
@@ -37,8 +35,8 @@ export default function LoginPage() {
         },
       });
       if (error) throw error;
-    } catch (err: any) {
-      setError(err.message || `Failed to sign in with ${provider}`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : `Failed to sign in with ${provider}`);
     }
   };
 
@@ -57,8 +55,8 @@ export default function LoginPage() {
 
       router.push('/sell');
       router.refresh();
-    } catch (err: any) {
-      setError(err.message || 'Failed to sign in');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to sign in');
     } finally {
       setLoading(false);
     }
@@ -68,8 +66,6 @@ export default function LoginPage() {
     <div className="min-h-screen bg-zinc-950 flex flex-col relative overflow-hidden">
       {/* Background Glows */}
       <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-amber-500/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-zinc-100/5 rounded-full blur-[120px]" />
       </div>
 
       <div className="flex-1 flex items-center justify-center p-6 relative z-10">

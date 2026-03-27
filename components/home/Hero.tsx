@@ -11,8 +11,7 @@ export function Hero() {
     <section className="relative py-32 flex items-center overflow-hidden">
       {/* Background Accents */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-amber-500/10 rounded-full blur-[120px] animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-zinc-100/5 rounded-full blur-[120px]" />
+
       </div>
 
       <div className="container mx-auto px-6 relative z-10">
@@ -93,14 +92,14 @@ export function Hero() {
                       <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                       <span className="text-[10px] font-black text-white uppercase tracking-widest">Live Marketplace</span>
                     </div>
-                    <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">1,240+ Active Listings</p>
+                    <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Active Listings</p>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Floating Stats Card */}
-            <div className="absolute -bottom-6 -left-6 bg-zinc-900 border border-white/10 p-6 rounded-3xl shadow-2xl backdrop-blur-xl">
+            <div className="absolute -bottom-6 -left-6 bg-zinc-900 border border-white/10 p-6 rounded-3xl shadow-2xl">
               <div className="flex items-center space-x-4">
                 <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center">
                   <ShieldCheck className="w-6 h-6 text-zinc-950" />

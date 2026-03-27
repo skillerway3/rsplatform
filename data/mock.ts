@@ -17,7 +17,7 @@ export const USERS: User[] = [
   {
     id: 'u1',
     username: 'PremiumTrader',
-    avatar: 'https://picsum.photos/seed/u1/200/200',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=u1',
     rating: 4.9,
     totalSales: 1250,
     isVerified: true,
@@ -26,7 +26,7 @@ export const USERS: User[] = [
   {
     id: 'u2',
     username: 'IronmanSupplies',
-    avatar: 'https://picsum.photos/seed/u2/200/200',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=u2',
     rating: 4.8,
     totalSales: 850,
     isVerified: true,
@@ -47,7 +47,7 @@ export const LISTINGS: Listing[] = [
     stock: 5000,
     deliveryTime: '5 mins',
     deliveryMethod: 'Face-to-Face',
-    images: ['https://picsum.photos/seed/gold1/800/600'],
+    images: [],
     isFeatured: true,
     createdAt: '2024-03-10',
   },
@@ -63,7 +63,7 @@ export const LISTINGS: Listing[] = [
     stock: 1,
     deliveryTime: '15 mins',
     deliveryMethod: 'Face-to-Face',
-    images: ['https://picsum.photos/seed/tbow/800/600'],
+    images: [],
     isFeatured: true,
     createdAt: '2024-03-12',
   },
@@ -79,7 +79,7 @@ export const LISTINGS: Listing[] = [
     stock: 10000,
     deliveryTime: '10 mins',
     deliveryMethod: 'Face-to-Face',
-    images: ['https://picsum.photos/seed/rs3gold/800/600'],
+    images: [],
     createdAt: '2024-03-15',
   },
   {
@@ -94,7 +94,7 @@ export const LISTINGS: Listing[] = [
     stock: 1,
     deliveryTime: '30 mins',
     deliveryMethod: 'Manual Transfer',
-    images: ['https://picsum.photos/seed/maxed/800/600'],
+    images: [],
     isFeatured: true,
     createdAt: '2024-03-18',
     accountMetadata: {
@@ -119,7 +119,7 @@ export const LISTINGS: Listing[] = [
     stock: 1,
     deliveryTime: 'Instant',
     deliveryMethod: 'Jagex Launcher',
-    images: ['https://picsum.photos/seed/ironman/800/600'],
+    images: [],
     createdAt: '2024-03-19',
     accountMetadata: {
       build: 'Ironman',
@@ -143,7 +143,7 @@ export const LISTINGS: Listing[] = [
     stock: 1000,
     deliveryTime: '10 mins',
     deliveryMethod: 'Face-to-Face',
-    images: ['https://picsum.photos/seed/gold2/800/600'],
+    images: [],
     createdAt: '2024-03-20',
   },
   {
@@ -158,7 +158,7 @@ export const LISTINGS: Listing[] = [
     stock: 1,
     deliveryTime: '15 mins',
     deliveryMethod: 'Face-to-Face',
-    images: ['https://picsum.photos/seed/scythe/800/600'],
+    images: [],
     createdAt: '2024-03-21',
   },
 ];

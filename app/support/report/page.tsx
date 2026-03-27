@@ -13,8 +13,7 @@ import {
   FileText,
   Upload,
   X,
-  Film,
-  Image as ImageIcon
+  Film
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -108,7 +107,7 @@ export default function ReportProblemPage() {
       setSubject('');
       setDescription('');
       setEvidence([]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error submitting report:', err);
       setError('Failed to submit report. Please try again.');
     } finally {
@@ -129,8 +128,6 @@ export default function ReportProblemPage() {
     <div className="pt-32 pb-32 bg-zinc-950 min-h-screen relative overflow-hidden">
       {/* Background Glows */}
       <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-amber-500/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-zinc-100/5 rounded-full blur-[120px]" />
       </div>
 
       <div className="container mx-auto px-6 relative z-10">

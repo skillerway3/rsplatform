@@ -3,7 +3,6 @@
 import React from 'react';
 import Image from 'next/image';
 import { Input } from '@/components/ui/Input';
-import { Card } from '@/components/ui/Card';
 import { Image as ImageIcon, X } from 'lucide-react';
 
 interface SellStepDetailsProps {

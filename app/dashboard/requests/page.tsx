@@ -1,35 +1,29 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { 
   Clock, 
-  DollarSign, 
-  ChevronRight, 
-  ShieldCheck, 
   AlertCircle,
   CheckCircle2,
-  XCircle,
   MessageSquare,
   Zap,
   Loader2,
-  MoreVertical,
   Trash2,
-  ExternalLink,
-  X
+  X,
+  ShieldCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { createNotification } from '@/lib/notifications';
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
-import { Button } from '@/components/ui/Button';
 
 interface Offer {
   id: string;
+  buyer_request_id: string;
   seller_id: string;
   price: number;
   delivery_time: string;
@@ -37,18 +31,13 @@ interface Offer {
   status: string;
   created_at: string;
   seller: {
+    id: string;
     username: string;
     avatar_url: string;
     average_rating: number;
     review_count: number;
     is_trusted_seller: boolean;
-  } | {
-    username: string;
-    avatar_url: string;
-    average_rating: number;
-    review_count: number;
-    is_trusted_seller: boolean;
-  }[];
+  };
 }
 
 interface BuyerRequest {
@@ -64,19 +53,17 @@ interface BuyerRequest {
 }
 
 export default function BuyerRequestsPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [requests, setRequests] = useState<BuyerRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [requestToClose, setRequestToClose] = useState<string | null>(null);
 
   const fetchRequests = useCallback(async () => {
     if (!user) return;
     try {
       setLoading(true);
-      // Simplified query: Fetch requests first, then offers and sellers in separate steps
       const { data: requestsData, error: requestsError } = await supabase
         .from('buyer_requests')
         .select('id, title, description, category, game, status, created_at, expires_at')
@@ -91,7 +78,6 @@ export default function BuyerRequestsPage() {
 
       const requestIds = requestsData.map(r => r.id);
 
-      // Fetch offers for these requests
       const { data: offersData, error: offersError } = await supabase
         .from('buyer_request_offers')
         .select('id, buyer_request_id, seller_id, price, delivery_time, message, status, created_at')
@@ -99,30 +85,46 @@ export default function BuyerRequestsPage() {
 
       if (offersError) throw offersError;
 
-      // Fetch sellers for these offers
       const sellerIds = Array.from(new Set(offersData?.map(o => o.seller_id).filter(Boolean) || []));
-      let sellers: any[] = [];
+      let sellers: Offer['seller'][] = [];
       if (sellerIds.length > 0) {
         const { data: sellersData } = await supabase
           .from('profiles')
           .select('id, username, avatar_url, average_rating, review_count, is_trusted_seller')
           .in('id', sellerIds);
-        sellers = sellersData || [];
+        
+        if (sellersData) {
+          sellers = sellersData.map(s => ({
+            id: s.id,
+            username: s.username,
+            avatar_url: s.avatar_url || '',
+            average_rating: s.average_rating || 0,
+            review_count: s.review_count || 0,
+            is_trusted_seller: s.is_trusted_seller || false
+          }));
+        }
       }
 
-      // Map everything back together
       const enrichedRequests = requestsData.map(req => {
         const reqOffers = (offersData || [])
           .filter(o => o.buyer_request_id === req.id)
-          .map(offer => ({
-            ...offer,
-            seller: sellers.find(s => s.id === offer.seller_id) || { username: 'Unknown', avatar_url: '' }
-          }))
+          .map(offer => {
+            const seller = sellers.find((s) => s.id === offer.seller_id);
+            return {
+              ...offer,
+              seller: seller || { 
+                id: offer.seller_id,
+                username: 'Unknown', 
+                avatar_url: '',
+                average_rating: 0,
+                review_count: 0,
+                is_trusted_seller: false
+              }
+            };
+          })
           .sort((a, b) => {
-            const sellerA = a.seller;
-            const sellerB = b.seller;
-            if (sellerA?.is_trusted_seller && !sellerB?.is_trusted_seller) return -1;
-            if (!sellerA?.is_trusted_seller && sellerB?.is_trusted_seller) return 1;
+            if (a.seller.is_trusted_seller && !b.seller.is_trusted_seller) return -1;
+            if (!a.seller.is_trusted_seller && b.seller.is_trusted_seller) return 1;
             return a.price - b.price;
           });
 
@@ -132,17 +134,22 @@ export default function BuyerRequestsPage() {
         };
       });
 
-      setRequests(enrichedRequests as any);
-    } catch (err: any) {
-      setError(err.message);
+      setRequests(enrichedRequests as BuyerRequest[]);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch requests');
     } finally {
       setLoading(false);
     }
   }, [user]);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
     fetchRequests();
-  }, [fetchRequests]);
+  }, [user, authLoading, fetchRequests, router]);
 
   const handleCloseRequest = async (requestId: string) => {
     try {
@@ -153,13 +160,13 @@ export default function BuyerRequestsPage() {
 
       if (error) throw error;
       fetchRequests();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error closing request:', err);
-      setError(err.message || 'Failed to close request');
+      setError(err instanceof Error ? err.message : 'Failed to close request');
     }
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
@@ -262,16 +269,16 @@ export default function BuyerRequestsPage() {
                           <div className="flex items-center gap-4">
                             <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-white/10 shrink-0">
                               <Image
-                                src={(Array.isArray(offer.seller) ? offer.seller[0]?.avatar_url : offer.seller?.avatar_url) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${Array.isArray(offer.seller) ? offer.seller[0]?.username : offer.seller?.username}`}
-                                alt={Array.isArray(offer.seller) ? offer.seller[0]?.username : offer.seller?.username || 'Seller'}
+                                src={offer.seller.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${offer.seller.username}`}
+                                alt={offer.seller.username || 'Seller'}
                                 fill
                                 className="object-cover"
                               />
                             </div>
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-2 mb-1">
-                                <h4 className="text-sm font-black uppercase tracking-widest text-white truncate">{Array.isArray(offer.seller) ? offer.seller[0]?.username : offer.seller?.username}</h4>
-                                {(Array.isArray(offer.seller) ? offer.seller[0]?.is_trusted_seller : offer.seller?.is_trusted_seller) && (
+                                <h4 className="text-sm font-black uppercase tracking-widest text-white truncate">{offer.seller.username}</h4>
+                                {offer.seller.is_trusted_seller && (
                                   <div className="flex items-center px-1.5 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded text-[7px] font-black text-amber-500 uppercase tracking-widest">
                                     <ShieldCheck className="w-2.5 h-2.5 mr-1" />
                                     Trusted
@@ -279,7 +286,7 @@ export default function BuyerRequestsPage() {
                                 )}
                                 <div className="flex items-center text-[10px] text-amber-500">
                                   <Zap className="w-3 h-3 mr-1 fill-amber-500" />
-                                  <span>{Array.isArray(offer.seller) ? offer.seller[0]?.average_rating : offer.seller?.average_rating} ({Array.isArray(offer.seller) ? offer.seller[0]?.review_count : offer.seller?.review_count})</span>
+                                  <span>{offer.seller.average_rating} ({offer.seller.review_count})</span>
                                 </div>
                               </div>
                               <p className="text-xs text-zinc-500 line-clamp-1 italic">&quot;{offer.message}&quot;</p>

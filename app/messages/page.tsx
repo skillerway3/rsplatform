@@ -33,7 +33,6 @@ export default function MessagesPage() {
         />
 
         <ChatWindow 
-          selectedChat={selectedChat}
           activeUser={activeUser}
           isMobileListOpen={isMobileListOpen}
           onBack={() => setIsMobileListOpen(true)}

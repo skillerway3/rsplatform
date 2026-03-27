@@ -7,13 +7,11 @@ import {
   HelpCircle, 
   BookOpen, 
   Search, 
-  ChevronRight, 
   Mail, 
   Globe, 
   Clock,
   ArrowRight,
   ExternalLink,
-  LifeBuoy,
   Lock,
   Zap,
   X,
@@ -22,9 +20,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
-import { Badge } from '@/components/ui/Badge';
+import { Card } from '@/components/ui/Card';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
 
@@ -96,7 +92,7 @@ export default function SupportPage() {
       } else {
         setSubmitError(result.error || 'Failed to send message. Please try again.');
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to send support request:', error);
       setSubmitError('A network error occurred. Please check your connection.');
     } finally {
@@ -108,8 +104,6 @@ export default function SupportPage() {
     <div className="pt-32 pb-32 bg-zinc-950 min-h-screen relative overflow-hidden">
       {/* Background Glows */}
       <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-amber-500/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-zinc-100/5 rounded-full blur-[120px]" />
       </div>
 
       <div className="container mx-auto px-6 relative z-10">

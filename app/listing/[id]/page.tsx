@@ -14,7 +14,6 @@ import {
   Lock,
   MessageSquare,
   Share2,
-  Flag,
   ShieldAlert,
   Clock,
   CheckCircle,
@@ -24,21 +23,58 @@ import {
   Info,
   Loader2,
   AlertCircle,
-  X
+  X,
+  Package
 } from 'lucide-react';
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 import { motion } from 'motion/react';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 
 import { PayPalButtons } from "@paypal/react-paypal-js";
 
+interface Seller {
+  id: string;
+  username: string;
+  avatar: string;
+  isVerified: boolean;
+  isTrusted: boolean;
+  rating: number;
+  totalSales: number;
+}
+
+interface ListingMetadata {
+  build?: string;
+  type?: string;
+  totalLevel?: string;
+  loginMethod?: string;
+  highlights?: string[];
+  notes?: string;
+}
+
+interface Listing {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  game: string;
+  category: string;
+  seller_id: string;
+  created_at: string;
+  gameId: string;
+  categoryId: string;
+  deliveryTime: string;
+  deliveryMethod: string;
+  seller: Seller;
+  metadata?: ListingMetadata;
+}
+
 export default function ListingDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const router = useRouter();
   
-  const [listing, setListing] = React.useState<any>(null);
+  const [listing, setListing] = React.useState<Listing | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [showCheckout, setShowCheckout] = React.useState(false);
@@ -63,9 +99,9 @@ export default function ListingDetailPage() {
 
       const order = await response.json();
       router.push(`/orders/${order.id}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error creating order:', err);
-      setError(err.message || 'Failed to process purchase. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to process purchase. Please try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -78,7 +114,7 @@ export default function ListingDetailPage() {
         // Fetch listing first
         const { data: listingData, error: fetchError } = await supabase
           .from('listings')
-          .select('*')
+          .select('id, title, description, price, game, category, status, seller_id, created_at, metadata')
           .eq('id', id)
           .single();
 
@@ -91,7 +127,7 @@ export default function ListingDetailPage() {
           .eq('id', listingData.seller_id)
           .single();
 
-        const transformedListing = {
+        const transformedListing: Listing = {
           ...listingData,
           gameId: listingData.game,
           categoryId: listingData.category,
@@ -109,9 +145,9 @@ export default function ListingDetailPage() {
         };
 
         setListing(transformedListing);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error fetching listing:', err);
-        setError(err.message);
+        setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
         setLoading(false);
       }
@@ -174,16 +210,10 @@ export default function ListingDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-16">
           {/* Left Column: Media & Details */}
           <div className="lg:col-span-8 space-y-16">
-            {/* Image Gallery */}
+            {/* Image Gallery Placeholder */}
             <div className="space-y-6">
-              <div className="aspect-video relative rounded-[2rem] overflow-hidden border border-white/5 bg-zinc-900/50 shadow-2xl group">
-                <Image 
-                  src={listing.images[0]} 
-                  alt={listing.title} 
-                  fill
-                  className="object-cover transition-transform duration-1000 group-hover:scale-105"
-                  referrerPolicy="no-referrer"
-                />
+              <div className="aspect-video relative rounded-[2rem] overflow-hidden border border-white/5 bg-zinc-900/50 shadow-2xl group flex items-center justify-center">
+                <Package className="w-24 h-24 text-zinc-800" />
                 <div className="absolute top-8 left-8 flex space-x-3">
                   <Badge variant="gold" className="px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] shadow-xl">
                     {listing.gameId}
@@ -193,15 +223,6 @@ export default function ListingDetailPage() {
                   </Badge>
                 </div>
               </div>
-              {listing.images.length > 1 && (
-                <div className="grid grid-cols-4 gap-6">
-                  {listing.images.slice(1).map((img: string, i: number) => (
-                    <div key={i} className="aspect-video relative rounded-2xl overflow-hidden border border-white/5 bg-zinc-900/50 cursor-pointer hover:border-amber-500/50 transition-all hover:scale-[1.02] active:scale-95 shadow-lg">
-                      <Image src={img} alt="" fill className="object-cover" referrerPolicy="no-referrer" />
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
 
             {/* Title & Description */}
@@ -236,22 +257,22 @@ export default function ListingDetailPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {[
-                    { label: 'Account Build', value: metadata.build, icon: Trophy },
-                    { label: 'Account Type', value: metadata.type, icon: Zap },
-                    { label: 'Total Level', value: metadata.totalLevel, icon: Star },
-                    { label: 'Login Method', value: metadata.loginMethod, icon: Lock },
-                  ].map((spec: any, i: number) => (
-                    <div key={i} className="bg-zinc-950/50 border border-zinc-900 rounded-3xl p-6 space-y-4 hover:border-zinc-800 transition-colors group">
-                      <div className="w-10 h-10 rounded-2xl bg-zinc-900 flex items-center justify-center group-hover:bg-amber-500/10 transition-colors">
-                        <spec.icon className="w-5 h-5 text-zinc-600 group-hover:text-amber-500 transition-colors" />
+                    {[
+                      { label: 'Account Build', value: metadata.build, icon: Trophy },
+                      { label: 'Account Type', value: metadata.type, icon: Zap },
+                      { label: 'Total Level', value: metadata.totalLevel, icon: Star },
+                      { label: 'Login Method', value: metadata.loginMethod, icon: Lock },
+                    ].map((spec, i) => (
+                      <div key={i} className="bg-zinc-950/50 border border-zinc-900 rounded-3xl p-6 space-y-4 hover:border-zinc-800 transition-colors group">
+                        <div className="w-10 h-10 rounded-2xl bg-zinc-900 flex items-center justify-center group-hover:bg-amber-500/10 transition-colors">
+                          <spec.icon className="w-5 h-5 text-zinc-600 group-hover:text-amber-500 transition-colors" />
+                        </div>
+                        <div>
+                          <div className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">{spec.label}</div>
+                          <div className="text-zinc-100 font-bold text-lg tracking-tight">{spec.value}</div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">{spec.label}</div>
-                        <div className="text-zinc-100 font-bold text-lg tracking-tight">{spec.value}</div>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -355,8 +376,9 @@ export default function ListingDetailPage() {
                           <PayPalButtons 
                             style={{ layout: "vertical", color: "gold", shape: "rect", label: "pay", height: 56 }}
                             disabled={isProcessing}
-                            createOrder={(data: any, actions: any) => {
+                            createOrder={(data, actions) => {
                               return actions.order.create({
+                                intent: "CAPTURE",
                                 purchase_units: [
                                   {
                                     amount: {

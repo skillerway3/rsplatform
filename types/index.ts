@@ -43,18 +43,13 @@ export interface Listing {
   id: string;
   sellerId: string;
   gameId: GameId;
-  sectionId?: SectionId;
   categoryId: CategoryId;
   title: string;
   description: string;
   price: number;
-  stock: number;
   deliveryTime: string;
   deliveryMethod: string;
-  images: string[];
-  isFeatured?: boolean;
   createdAt: string;
-  accountMetadata?: AccountMetadata;
   metadata?: any;
   seller?: User;
 }

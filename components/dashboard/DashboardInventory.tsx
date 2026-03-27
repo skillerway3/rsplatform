@@ -1,6 +1,5 @@
 import * as React from 'react';
-import Image from 'next/image';
-import { Settings, ChevronRight } from 'lucide-react';
+import { Settings, ChevronRight, Package } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -11,8 +10,6 @@ interface Listing {
   title: string;
   gameId: string;
   price: number;
-  stock: number;
-  images: string[];
 }
 
 interface DashboardInventoryProps {
@@ -40,7 +37,6 @@ export function DashboardInventory({ listings }: DashboardInventoryProps) {
               <th className="px-10 py-6 text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em]">Item</th>
               <th className="px-10 py-6 text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em]">Status</th>
               <th className="px-10 py-6 text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em]">Price</th>
-              <th className="px-10 py-6 text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em]">Stock</th>
               <th className="px-10 py-6 text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em]">Actions</th>
             </tr>
           </thead>
@@ -50,13 +46,9 @@ export function DashboardInventory({ listings }: DashboardInventoryProps) {
                 <td className="px-10 py-8">
                   <div className="flex items-center space-x-4">
                     <div className="w-12 h-12 rounded-xl bg-zinc-900 overflow-hidden border border-white/5 shrink-0 relative">
-                      <Image 
-                        src={listing.images[0]} 
-                        alt={listing.title} 
-                        fill 
-                        className="object-cover"
-                        referrerPolicy="no-referrer"
-                      />
+                      <div className="w-full h-full flex items-center justify-center bg-zinc-800">
+                        <Package className="w-6 h-6 text-zinc-600" />
+                      </div>
                     </div>
                     <div className="space-y-1">
                       <div className="text-xs font-black text-zinc-100 uppercase tracking-widest">{listing.title}</div>
@@ -69,9 +61,6 @@ export function DashboardInventory({ listings }: DashboardInventoryProps) {
                 </td>
                 <td className="px-10 py-8 text-sm font-black text-zinc-100 tracking-tighter">
                   {formatCurrency(listing.price)}
-                </td>
-                <td className="px-10 py-8 text-xs font-black text-zinc-500 uppercase tracking-widest">
-                  {listing.stock} Units
                 </td>
                 <td className="px-10 py-8">
                   <Button variant="ghost" size="icon" className="rounded-xl border border-zinc-800 h-10 w-10">

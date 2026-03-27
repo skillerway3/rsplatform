@@ -7,15 +7,11 @@ import {
   Clock, 
   User, 
   ShieldCheck, 
-  CheckCircle2, 
-  AlertCircle,
   Search,
-  Filter,
   ArrowLeft,
   Loader2,
   ChevronRight
 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/lib/supabase';
@@ -32,8 +28,8 @@ interface SupportThread {
   priority: string;
   last_message_at: string;
   created_at: string;
-  user?: { username: string } | { username: string }[];
-  assigned_admin?: { username: string } | { username: string }[];
+  user?: { username: string } | null;
+  assigned_admin?: { username: string } | null;
 }
 
 export default function AdminSupportThreadsPage() {
@@ -77,10 +73,10 @@ export default function AdminSupportThreadsPage() {
           const profileMap = (profilesData || []).reduce((acc, p) => {
             acc[p.id] = p;
             return acc;
-          }, {} as Record<string, any>);
+          }, {} as Record<string, { id: string; username: string }>);
 
           // Map profiles back to threads
-          const enrichedThreads = threadsData.map(t => ({
+          const enrichedThreads: SupportThread[] = threadsData.map(t => ({
             ...t,
             user: t.user_id ? profileMap[t.user_id] : null,
             assigned_admin: t.assigned_to ? profileMap[t.assigned_to] : null
@@ -90,7 +86,7 @@ export default function AdminSupportThreadsPage() {
         } else {
           setThreads([]);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error fetching support threads:', err);
       } finally {
         setLoading(false);
@@ -103,7 +99,7 @@ export default function AdminSupportThreadsPage() {
   const filteredThreads = threads.filter(t => {
     const matchesFilter = filter === 'all' || t.status === filter;
     const matchesSearch = 
-      (Array.isArray(t.user) ? t.user[0]?.username : t.user?.username || t.guest_name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (t.user?.username || t.guest_name || '').toLowerCase().includes(search.toLowerCase()) ||
       (t.guest_email || '').toLowerCase().includes(search.toLowerCase()) ||
       t.subject.toLowerCase().includes(search.toLowerCase());
     return matchesFilter && matchesSearch;

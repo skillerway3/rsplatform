@@ -34,7 +34,7 @@ export async function POST(
     // 3. Get the transaction
     const { data: transaction, error: txError } = await adminClient
       .from("wallet_transactions")
-      .select("*")
+      .select("id, type, status")
       .eq("id", id)
       .single();
 
@@ -66,8 +66,9 @@ export async function POST(
     });
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error("Admin withdrawal processing error:", error);
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error("Admin withdrawal processing error:", err);
+    return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });
   }
 }

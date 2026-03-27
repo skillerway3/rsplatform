@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { Upload, Info, ChevronDown, FileText, Check } from 'lucide-react';
+import { Upload, FileText, Check } from 'lucide-react';
 import { AccountTypeSelector } from './AccountTypeSelector';
 
 interface FireCapeFormProps {

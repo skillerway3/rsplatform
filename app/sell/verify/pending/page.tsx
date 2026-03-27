@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { Clock, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Clock, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 

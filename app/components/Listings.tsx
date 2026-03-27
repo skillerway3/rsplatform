@@ -24,7 +24,7 @@ export default function Listings() {
   async function load() {
     const { data, error } = await supabase
       .from("listings")
-      .select("*")
+      .select("id, created_at, title, description, price, game")
       .eq("status", "active")
       .order("created_at", { ascending: false });
 

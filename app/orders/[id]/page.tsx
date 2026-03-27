@@ -4,11 +4,10 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { ShieldCheck, Clock, Zap, MessageSquare, CheckCircle2, AlertCircle, Loader2, ArrowLeft, ExternalLink, ChevronRight, Truck, Upload, X, Package2 } from 'lucide-react';
+import { ShieldCheck, Clock, Zap, CheckCircle2, AlertCircle, Loader2, ExternalLink, ChevronRight, Truck, Upload, X, Package2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { PayPalButtons } from "@paypal/react-paypal-js";
 import { cn } from '@/lib/utils';
-import Link from 'next/link';
 import { ChatModal } from '@/components/marketplace/ChatModal';
 import { motion } from 'motion/react';
 import { PromptModal } from '@/components/ui/PromptModal';
@@ -45,25 +44,59 @@ interface Offer {
   };
 }
 
+interface Order {
+  id: string;
+  status: string;
+  created_at: string;
+  resolved_at?: string;
+  delivered_at?: string;
+  deadline_at?: string;
+  seller_id: string;
+  buyer_id: string;
+  total_price: number;
+  platform_fee?: number;
+  seller_payout?: number;
+  listing_id?: string;
+  request_id?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  listings?: any;
+  extra_time_requested_at?: string;
+  extra_time_reason?: string;
+  extra_time_hours?: number;
+  extra_time_status?: string;
+}
+
+interface Review {
+  id: string;
+  rating: number;
+  review_text: string;
+  created_at: string;
+}
+
+interface Proof {
+  id: string;
+  file_url: string;
+  note?: string;
+  created_at: string;
+  signed_url?: string;
+}
+
 export default function OrderPage() {
   const { id } = useParams();
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [request, setRequest] = useState<Request | null>(null);
   const [offers, setOffers] = useState<Offer[]>([]);
-  const [order, setOrder] = useState<any>(null);
+  const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeChat, setActiveChat] = useState<{ sellerId: string; title: string } | null>(null);
   const [closing, setClosing] = useState(false);
-  const [proof, setProof] = useState<any>(null);
+  const [proof, setProof] = useState<Proof | null>(null);
   const [delivering, setDelivering] = useState(false);
   const [deliveryNote, setDeliveryNote] = useState('');
   const [deliveryFile, setDeliveryFile] = useState<File | null>(null);
-  const [review, setReview] = useState<any>(null);
-  const [declineReason, setDeclineReason] = useState('');
-  const [extraTimeHours, setExtraTimeHours] = useState('');
-  const [extraTimeReason, setExtraTimeReason] = useState('');
+  const [review, setReview] = useState<Review | null>(null);
   const [isDeclining, setIsDeclining] = useState(false);
   const [isRequestingExtraTime, setIsRequestingExtraTime] = useState(false);
   const [isRespondingToExtraTime, setIsRespondingToExtraTime] = useState(false);
@@ -77,15 +110,16 @@ export default function OrderPage() {
   const [isDisputing, setIsDisputing] = useState(false);
 
   const [orderType, setOrderType] = useState<'direct' | 'request' | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [listing, setListing] = useState<any>(null);
-  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [, setIsAuthReady] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!id) return;
 
-    const mergeOffersWithProfiles = async (offersData: any[]) => {
+    const mergeOffersWithProfiles = async (offersData: Record<string, unknown>[]) => {
       if (!offersData || offersData.length === 0) return [];
-      const sellerIds = Array.from(new Set(offersData.map((o: any) => o.seller_id)));
+      const sellerIds = Array.from(new Set(offersData.map((o: Record<string, unknown>) => o.seller_id as string)));
       const { data: profilesData } = await supabase
         .from('profiles')
         .select('id, username, is_verified_seller, is_trusted_seller, avatar_url, average_rating, review_count')
@@ -94,21 +128,21 @@ export default function OrderPage() {
       const profilesMap = (profilesData || []).reduce((acc, profile) => {
         acc[profile.id] = profile;
         return acc;
-      }, {} as Record<string, any>);
+      }, {} as Record<string, Record<string, unknown>>);
 
-      return offersData.map((offer: any) => ({
+      return offersData.map((offer: Record<string, unknown>) => ({
         ...offer,
-        profiles: profilesMap[offer.seller_id]
-      }));
+        profiles: profilesMap[offer['seller_id'] as string]
+      })) as Offer[];
     };
 
     try {
       setLoading(true);
       setError(null);
       // 1. Try to fetch as an order first
-      const { data: orderData, error: orderError } = await supabase
+      const { data: orderData } = await supabase
         .from('orders')
-        .select('*, listings(*)')
+        .select('id, buyer_id, seller_id, listing_id, total_price, platform_fee, seller_payout, status, created_at, paypal_order_id, listings(id, title, description, price, game, category)')
         .eq('id', id)
         .maybeSingle();
 
@@ -118,54 +152,34 @@ export default function OrderPage() {
         // If it's a direct listing purchase
         if (orderData.listing_id) {
           setOrderType('direct');
-          setListing(orderData.listings);
+          setListing(Array.isArray(orderData.listings) ? orderData.listings[0] : orderData.listings);
         } 
-        // If it's a buyer request order
-        else if (orderData.request_id) {
-          setOrderType('request');
-          const { data: reqData } = await supabase
-            .from('buyer_requests')
-            .select('*')
-            .eq('id', orderData.request_id)
-            .single();
-          
-          if (reqData) setRequest(reqData);
-
-          const { data: offersData } = await supabase
-            .from('buyer_request_offers')
-            .select('*')
-            .eq('request_id', orderData.request_id);
-          
-          if (offersData) {
-            const merged = await mergeOffersWithProfiles(offersData);
-            setOffers(merged);
-          }
-        }
 
         // Fetch proof if delivered or completed
         if (orderData.status === 'delivered' || orderData.status === 'completed') {
           const { data: proofData } = await supabase
             .from('buyer_request_proofs')
-            .select('*')
+            .select('id, order_id, file_url, note, created_at')
             .eq('order_id', orderData.id)
             .maybeSingle();
           
           if (proofData) {
-            const filePath = proofData.file_url?.split('/').pop();
+            const proof = proofData as Proof;
+            const filePath = proof.file_url?.split('/').pop();
             if (filePath) {
               const { data: signedData } = await supabase.storage
                 .from('verifications')
                 .createSignedUrl(`proofs/${orderData.id}/${filePath}`, 3600);
               
-              if (signedData) proofData.signed_url = signedData.signedUrl;
+              if (signedData) proof.signed_url = signedData.signedUrl;
             }
-            setProof(proofData);
+            setProof(proof);
           }
 
           if (orderData.status === 'completed') {
             const { data: reviewData } = await supabase
               .from('seller_reviews')
-              .select('*')
+              .select('id, order_id, seller_id, buyer_id, rating, review_text, created_at')
               .eq('order_id', orderData.id)
               .maybeSingle();
             
@@ -178,7 +192,7 @@ export default function OrderPage() {
       // 2. If not an order, try to fetch as a buyer request (pre-order state)
       const { data: reqData, error: reqError } = await supabase
         .from('buyer_requests')
-        .select('*')
+        .select('id, title, description, budget, status, created_at, expires_at, buyer_id, game, category')
         .eq('id', id)
         .single();
 
@@ -188,7 +202,7 @@ export default function OrderPage() {
 
       const { data: offersData, error: offersError } = await supabase
         .from('buyer_request_offers')
-        .select('*')
+        .select('id, request_id, seller_id, price, message, status, created_at')
         .eq('request_id', id)
         .order('created_at', { ascending: false });
 
@@ -202,15 +216,15 @@ export default function OrderPage() {
       if (reqData.status === 'matched' || reqData.status === 'in_progress' || reqData.status === 'delivered' || reqData.status === 'completed') {
         const { data: orderData } = await supabase
           .from('orders')
-          .select('*')
-          .eq('request_id', id)
+          .select('id, buyer_id, seller_id, listing_id, request_id, total_price, status, created_at, paypal_order_id')
+          .or(`listing_id.eq.${id},request_id.eq.${id}`)
           .maybeSingle();
         
-        if (orderData) setOrder(orderData);
+        if (orderData) setOrder(orderData as Order);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching data:', err);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
     }
@@ -259,7 +273,7 @@ export default function OrderPage() {
     setSubmittingReview(true);
     setError(null);
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('seller_reviews')
         .insert({
           order_id: order.id,
@@ -268,7 +282,7 @@ export default function OrderPage() {
           rating,
           review_text: reviewText
         })
-        .select()
+        .select('id, rating, review_text, created_at')
         .single();
 
       await createNotification({
@@ -279,8 +293,8 @@ export default function OrderPage() {
         link: `/orders/${order.id}`
       });
 
-      setReview(data);
-    } catch (err: any) {
+      setReview(data as Review);
+    } catch (err: unknown) {
       console.error('Error submitting review:', err);
       setError('Failed to submit review.');
     } finally {
@@ -290,6 +304,7 @@ export default function OrderPage() {
 
   const handleApprove = async () => {
     try {
+      if (!order) return;
       setIsApproving(true);
       setError(null);
       
@@ -330,7 +345,7 @@ export default function OrderPage() {
       }
 
       await fetchData();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error approving order:', err);
       setError('Failed to approve order.');
     } finally {
@@ -340,6 +355,7 @@ export default function OrderPage() {
 
   const handleDispute = async () => {
     try {
+      if (!order) return;
       setIsDisputing(true);
       setError(null);
       const { error } = await supabase
@@ -350,7 +366,7 @@ export default function OrderPage() {
       if (error) throw error;
 
       await fetchData();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error opening dispute:', err);
       setError('Failed to open dispute.');
     } finally {
@@ -385,9 +401,9 @@ export default function OrderPage() {
       }
 
       await fetchData();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error accepting offer:', err);
-      setError(err.message || 'Failed to accept offer. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to accept offer. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -440,7 +456,7 @@ export default function OrderPage() {
       }
 
       await fetchData();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error delivering order:', err);
       setError('Failed to deliver order.');
     } finally {
@@ -449,7 +465,7 @@ export default function OrderPage() {
   };
 
   const handleDecline = async (reason?: string) => {
-    const finalReason = reason || declineReason;
+    const finalReason = reason;
     if (!user || !order || !finalReason) return;
     setIsDeclining(true);
     try {
@@ -473,7 +489,7 @@ export default function OrderPage() {
       });
 
       await fetchData();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error declining order:', err);
       setError('Failed to decline order.');
     } finally {
@@ -482,8 +498,8 @@ export default function OrderPage() {
   };
 
   const handleRequestExtraTime = async (hours?: string, reason?: string) => {
-    const finalHours = hours || extraTimeHours;
-    const finalReason = reason || extraTimeReason;
+    const finalHours = hours;
+    const finalReason = reason;
     if (!user || !order || !finalHours || !finalReason) return;
     setIsRequestingExtraTime(true);
     try {
@@ -508,7 +524,7 @@ export default function OrderPage() {
       });
 
       await fetchData();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error requesting extra time:', err);
       setError('Failed to request extra time.');
     } finally {
@@ -520,9 +536,9 @@ export default function OrderPage() {
     if (!user || !order) return;
     setIsRespondingToExtraTime(true);
     try {
-      const updates: any = { extra_time_status: status };
+      const updates: Record<string, unknown> = { extra_time_status: status };
       
-      if (status === 'accepted' && order.deadline_at) {
+      if (status === 'accepted' && order.deadline_at && order.extra_time_hours) {
         const currentDeadline = new Date(order.deadline_at);
         currentDeadline.setHours(currentDeadline.getHours() + order.extra_time_hours);
         updates.deadline_at = currentDeadline.toISOString();
@@ -544,7 +560,7 @@ export default function OrderPage() {
       });
 
       await fetchData();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error responding to extra time:', err);
       setError('Failed to respond to extra time.');
     } finally {
@@ -654,7 +670,7 @@ export default function OrderPage() {
                 <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
                   <span className="flex items-center gap-1.5"><Zap className="w-3 h-3" /> {orderType === 'direct' ? listing?.game : request?.game}</span>
                   <span className="hidden md:block w-1 h-1 rounded-full bg-zinc-800" />
-                  <span className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> {new Date(orderType === 'direct' ? order?.created_at : (request?.created_at || Date.now())).toLocaleDateString()}</span>
+                  <span className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> {new Date(orderType === 'direct' ? (order?.created_at || Date.now()) : (request?.created_at || Date.now())).toLocaleDateString()}</span>
                 </div>
               </div>
 
@@ -896,6 +912,7 @@ export default function OrderPage() {
                               <div className="w-64">
                                   <PayPalButtons 
                                     style={{ layout: "vertical", color: "gold", shape: "rect", label: "pay", height: 44 }}
+                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                     createOrder={(data: any, actions: any) => {
                                       return actions.order.create({
                                         purchase_units: [

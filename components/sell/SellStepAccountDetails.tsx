@@ -22,8 +22,8 @@ const TOTAL_LEVELS = ['3-31', '32-499', '500-999', '1000-1499', '1500-1999', '20
 const TAGS = ['tutorial completed', 'trade ready', 'email set', 'clean', 'rested', 'rare items', 'quested'];
 
 interface SellStepAccountDetailsProps {
-  formData: any;
-  updateFormData: (data: any) => void;
+  formData: Record<string, unknown>;
+  updateFormData: (data: Partial<Record<string, unknown>>) => void;
 }
 
 export function SellStepAccountDetails({ formData, updateFormData }: SellStepAccountDetailsProps) {

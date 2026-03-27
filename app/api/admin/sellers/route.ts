@@ -39,8 +39,9 @@ export async function POST(req: Request) {
     if (updateError) throw updateError;
 
     return NextResponse.json({ success: true });
-  } catch (err: any) {
-    console.error('Admin sellers API error:', err);
-    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
+  } catch (err: unknown) {
+    const error = err as Error;
+    console.error('Admin sellers API error:', error);
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
 }

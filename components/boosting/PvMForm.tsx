@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { Info, Upload, FileText } from 'lucide-react';
+import { Upload, FileText } from 'lucide-react';
 import { AccountTypeSelector } from './AccountTypeSelector';
 
 interface PvMFormProps {
