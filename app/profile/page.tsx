@@ -30,7 +30,6 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import { formatDate, cn, isAdmin } from "@/lib/utils";
 import Link from "next/link";
-import Image from "next/image";
 
 interface Profile {
   id: string;
@@ -55,34 +54,34 @@ export default function ProfilePage() {
   const [success, setSuccess] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = React.useState(false);
+  const [avatarLoadError, setAvatarLoadError] = React.useState(false);
 
   React.useEffect(() => {
-    console.log('[ProfilePage] useEffect triggered:', { 
-      authLoading, 
-      userId: user?.id, 
-      authProfileId: authProfile?.id
+    console.log("[ProfilePage] useEffect triggered:", {
+      authLoading,
+      userId: user?.id,
+      authProfileId: authProfile?.id,
     });
-    
+
     if (authLoading) return;
 
     if (!user) {
-      console.log('[ProfilePage] No user found, redirecting to login');
+      console.log("[ProfilePage] No user found, redirecting to login");
       router.push("/login");
       return;
     }
 
-    // If we have a profile from AuthProvider that matches our user, use it
     if (authProfile && authProfile.id === user.id) {
-      console.log('[ProfilePage] Using profile from AuthProvider');
+      console.log("[ProfilePage] Using profile from AuthProvider");
       setProfile(authProfile);
       setUsername(authProfile.username ?? "");
+      setAvatarLoadError(false);
       setLoading(false);
       return;
     }
 
-    // Otherwise fetch it manually
     const fetchProfile = async () => {
-      console.log('[ProfilePage] Fetching profile manually for user:', user.id);
+      console.log("[ProfilePage] Fetching profile manually for user:", user.id);
       try {
         setLoading(true);
         setError(null);
@@ -94,12 +93,12 @@ export default function ProfilePage() {
           .maybeSingle();
 
         if (error) {
-          console.error('[ProfilePage] Error fetching profile:', error);
+          console.error("[ProfilePage] Error fetching profile:", error);
           throw error;
         }
 
         if (!data) {
-          console.error('[ProfilePage] Profile not found for user:', user.id);
+          console.error("[ProfilePage] Profile not found for user:", user.id);
           setError("Profile not found. Please try refreshing the page.");
           return;
         }
@@ -107,7 +106,8 @@ export default function ProfilePage() {
         const fetchedProfile = data as Profile;
         setProfile(fetchedProfile);
         setUsername(fetchedProfile.username ?? "");
-        console.log('[ProfilePage] Profile fetched successfully manually');
+        setAvatarLoadError(false);
+        console.log("[ProfilePage] Profile fetched successfully manually");
       } catch (err: unknown) {
         console.error("[ProfilePage] Unexpected error fetching profile:", err);
         setError("Failed to load profile. Please try refreshing the page.");
@@ -118,6 +118,12 @@ export default function ProfilePage() {
 
     void fetchProfile();
   }, [user, authLoading, authProfile, router]);
+
+  React.useEffect(() => {
+    if (profile?.avatar_url) {
+      setAvatarLoadError(false);
+    }
+  }, [profile?.avatar_url]);
 
   const handleUpdateProfile = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -177,6 +183,8 @@ export default function ProfilePage() {
 
     setUploading(true);
     setError(null);
+    setSuccess(false);
+    setAvatarLoadError(false);
 
     try {
       const fileExt = file.name.split(".").pop();
@@ -196,14 +204,16 @@ export default function ProfilePage() {
         data: { publicUrl },
       } = supabase.storage.from("avatars").getPublicUrl(filePath);
 
+      const avatarUrl = `${publicUrl}?t=${Date.now()}`;
+
       const { error: updateError } = await supabase
         .from("profiles")
-        .update({ avatar_url: publicUrl })
+        .update({ avatar_url: avatarUrl })
         .eq("id", user.id);
 
       if (updateError) throw updateError;
 
-      setProfile((prev) => (prev ? { ...prev, avatar_url: publicUrl } : null));
+      setProfile((prev) => (prev ? { ...prev, avatar_url: avatarUrl } : null));
       setSuccess(true);
       router.refresh();
     } catch (err: unknown) {
@@ -214,6 +224,9 @@ export default function ProfilePage() {
       );
     } finally {
       setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   };
 
@@ -279,13 +292,20 @@ export default function ProfilePage() {
                   <div className="w-32 h-32 rounded-[2.5rem] bg-zinc-900 flex items-center justify-center overflow-hidden border border-white/5 relative">
                     {uploading ? (
                       <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
-                    ) : profile?.avatar_url ? (
-                      <Image
+                    ) : profile?.avatar_url && !avatarLoadError ? (
+                      <img
+                        key={profile.avatar_url}
                         src={profile.avatar_url}
                         alt="Avatar"
-                        fill
-                        className="object-cover"
+                        className="w-full h-full object-cover"
                         referrerPolicy="no-referrer"
+                        onError={() => {
+                          console.error(
+                            "Avatar failed to load:",
+                            profile.avatar_url
+                          );
+                          setAvatarLoadError(true);
+                        }}
                       />
                     ) : (
                       <User className="w-12 h-12 text-zinc-800" />
