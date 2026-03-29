@@ -57,40 +57,45 @@ export default function ProfilePage() {
   const [uploading, setUploading] = React.useState(false);
 
   React.useEffect(() => {
+    console.log('[ProfilePage] useEffect triggered:', { authLoading, userId: user?.id, authProfileId: authProfile?.id });
+    
     if (authLoading) return;
 
     if (!user) {
+      console.log('[ProfilePage] No user, redirecting to login');
       router.push("/login");
       return;
     }
 
     if (authProfile && authProfile.id === user.id) {
-  const profileData: Profile = {
-    id: authProfile.id,
-    username:
-      typeof authProfile.username === "string" ? authProfile.username : null,
-    avatar_url:
-      typeof authProfile.avatar_url === "string" ? authProfile.avatar_url : null,
-    is_verified_seller: Boolean(authProfile.is_verified_seller),
-    is_trusted_seller: Boolean(authProfile.is_trusted_seller),
-    created_at:
-      typeof authProfile.created_at === "string"
-        ? authProfile.created_at
-        : new Date().toISOString(),
-    username_updated_at:
-      typeof authProfile.username_updated_at === "string"
-        ? authProfile.username_updated_at
-        : null,
-    role: typeof authProfile.role === "string" ? authProfile.role : null,
-  };
+      console.log('[ProfilePage] Using profile from AuthProvider');
+      const profileData: Profile = {
+        id: authProfile.id,
+        username:
+          typeof authProfile.username === "string" ? authProfile.username : null,
+        avatar_url:
+          typeof authProfile.avatar_url === "string" ? authProfile.avatar_url : null,
+        is_verified_seller: Boolean(authProfile.is_verified_seller),
+        is_trusted_seller: Boolean(authProfile.is_trusted_seller),
+        created_at:
+          typeof authProfile.created_at === "string"
+            ? authProfile.created_at
+            : new Date().toISOString(),
+        username_updated_at:
+          typeof authProfile.username_updated_at === "string"
+            ? authProfile.username_updated_at
+            : null,
+        role: typeof authProfile.role === "string" ? authProfile.role : null,
+      };
 
-  setProfile(profileData);
-  setUsername(profileData.username ?? "");
-  setLoading(false);
-  return;
-}
+      setProfile(profileData);
+      setUsername(profileData.username ?? "");
+      setLoading(false);
+      return;
+    }
 
     const fetchProfile = async () => {
+      console.log('[ProfilePage] Fetching profile manually...');
       try {
         setLoading(true);
         setError(null);
@@ -103,9 +108,13 @@ export default function ProfilePage() {
           .eq("id", user.id)
           .maybeSingle();
 
-        if (error) throw error;
+        if (error) {
+          console.error('[ProfilePage] Error fetching profile:', error);
+          throw error;
+        }
 
         if (!data) {
+          console.error('[ProfilePage] Profile not found for user:', user.id);
           setError("Profile not found. Please try refreshing the page.");
           return;
         }
@@ -113,8 +122,9 @@ export default function ProfilePage() {
         const fetchedProfile = data as Profile;
         setProfile(fetchedProfile);
         setUsername(fetchedProfile.username ?? "");
+        console.log('[ProfilePage] Profile fetched successfully');
       } catch (err: unknown) {
-        console.error("Error fetching profile:", err);
+        console.error("[ProfilePage] Unexpected error fetching profile:", err);
         setError("Failed to load profile");
       } finally {
         setLoading(false);

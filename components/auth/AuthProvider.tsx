@@ -40,6 +40,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (userId: string, userEmail?: string): Promise<void> => {
+    if (!userId) return;
+    
+    console.log('[AuthProvider] Fetching profile for:', userId);
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -49,9 +52,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .eq('id', userId)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[AuthProvider] Error fetching profile:', error);
+        throw error;
+      }
 
       if (!data) {
+        console.log('[AuthProvider] Profile not found, creating one...');
         // Profile doesn't exist, create one
         const newUsername = userEmail 
           ? userEmail.split('@')[0] + Math.floor(Math.random() * 1000)
@@ -69,7 +76,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           .single();
 
         if (insertError) {
-          console.error('Error creating profile:', insertError);
+          console.error('[AuthProvider] Error creating profile:', insertError);
           setProfile(null);
           return;
         }
@@ -85,6 +92,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           username_updated_at: typeof newData.username_updated_at === 'string' ? newData.username_updated_at : null,
         };
         setProfile(safeProfile);
+        console.log('[AuthProvider] Profile created successfully');
         return;
       }
 
@@ -107,57 +115,96 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         : null;
 
       setProfile(safeProfile);
+      console.log('[AuthProvider] Profile fetched successfully');
     } catch (err: unknown) {
-      console.error('Error fetching profile:', err);
+      console.error('[AuthProvider] Unexpected error in fetchProfile:', err);
       setProfile(null);
     }
   };
 
   useEffect(() => {
+    let isMounted = true;
+
     const loadInitialSession = async (): Promise<void> => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      console.log('[AuthProvider] Loading initial session...');
+      try {
+        const {
+          data: { session },
+          error
+        } = await supabase.auth.getSession();
 
-      setSession(session);
-      setUser(session?.user ?? null);
+        if (error) {
+          console.error('[AuthProvider] Error getting session:', error);
+        }
 
-      if (session?.user) {
-        await fetchProfile(session.user.id, session.user.email);
-      } else {
-        setProfile(null);
+        if (isMounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+
+          if (session?.user) {
+            await fetchProfile(session.user.id, session.user.email);
+          } else {
+            setProfile(null);
+          }
+        }
+      } catch (err) {
+        console.error('[AuthProvider] Unexpected error in loadInitialSession:', err);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+          console.log('[AuthProvider] Initial session load complete');
+        }
       }
-
-      setLoading(false);
     };
 
     void loadInitialSession();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[AuthProvider] Auth state changed:', event);
+      
+      if (isMounted) {
+        setSession(session);
+        setUser(session?.user ?? null);
 
-      if (session?.user) {
-        await fetchProfile(session.user.id, session.user.email);
-      } else {
-        setProfile(null);
+        if (session?.user) {
+          await fetchProfile(session.user.id, session.user.email);
+        } else {
+          setProfile(null);
+        }
+        
+        setLoading(false);
       }
-
-      setLoading(false);
     });
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, []);
 
   const signOut = async (): Promise<void> => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setSession(null);
-    setProfile(null);
+    console.log('[AuthProvider] Signing out...');
+    try {
+      // Clear state immediately for better UX
+      setUser(null);
+      setSession(null);
+      setProfile(null);
+      
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('[AuthProvider] Supabase signOut error:', error);
+      }
+    } catch (err) {
+      console.error('[AuthProvider] Unexpected error during signOut:', err);
+    } finally {
+      // Ensure state is cleared even if signOut fails
+      setUser(null);
+      setSession(null);
+      setProfile(null);
+      console.log('[AuthProvider] Sign out complete');
+    }
   };
 
   const isVerifiedSeller = Boolean(profile?.is_verified_seller);

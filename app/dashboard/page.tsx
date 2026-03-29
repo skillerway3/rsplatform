@@ -111,14 +111,18 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log('[DashboardPage] useEffect triggered:', { authLoading, userId: user?.id, authProfileId: authProfile?.id });
+    
     if (authLoading) return;
 
     if (!user) {
+      console.log('[DashboardPage] No user, stopping loading');
       setLoading(false);
       return;
     }
 
     const fetchDashboardData = async (): Promise<void> => {
+      console.log('[DashboardPage] Fetching dashboard data...');
       try {
         setLoading(true);
         setError(null);
@@ -127,6 +131,7 @@ export default function DashboardPage() {
           normalizeDashboardProfile(authProfile);
 
         if (!currentProfile) {
+          console.log('[DashboardPage] Profile not in AuthProvider, fetching manually...');
           const { data: pData, error: pError } = await supabase
             .from("profiles")
             .select("id, username, is_verified_seller, is_trusted_seller")
@@ -143,6 +148,7 @@ export default function DashboardPage() {
         }
 
         setProfile(currentProfile);
+        console.log('[DashboardPage] Profile loaded:', currentProfile?.username);
 
         const [
           { data: listings, error: lErr },

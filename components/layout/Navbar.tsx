@@ -290,8 +290,10 @@ export function Navbar() {
                         )}
                         <button
                           onClick={async () => {
-                            await signOut();
+                            console.log('[Navbar] Logout clicked');
                             setIsProfileOpen(false);
+                            await signOut();
+                            console.log('[Navbar] Sign out complete, redirecting...');
                             router.push('/');
                           }}
                           className="w-full flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-500/5 transition-all"
