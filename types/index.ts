@@ -34,7 +34,7 @@ export interface AccountMetadata {
   totalLevel: string;
   deliveryTime: string;
   tags: string[];
-  stats?: { [key: string]: number };
+  stats?: Record<string, number>;
   highlights?: string[];
   notes?: string;
 }
@@ -43,15 +43,31 @@ export interface Listing {
   id: string;
   sellerId: string;
   gameId: GameId;
+  sectionId: SectionId;
   categoryId: CategoryId;
   title: string;
   description: string;
   price: number;
+  stock?: number;
   deliveryTime: string;
   deliveryMethod: string;
+  images?: string[];
+  isFeatured?: boolean;
   createdAt: string;
-  metadata?: any;
+  metadata?: AccountMetadata | Record<string, unknown>;
+  accountMetadata?: AccountMetadata;
   seller?: User;
+}
+
+export interface AccountListing extends Listing {
+  sectionId: 'accounts';
+  categoryId: 'accounts';
+  metadata?: AccountMetadata;
+  accountMetadata?: AccountMetadata;
+}
+
+export function isAccountListing(listing: Listing): listing is AccountListing {
+  return listing.sectionId === 'accounts';
 }
 
 export interface Order {

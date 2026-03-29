@@ -60,9 +60,15 @@ export default function ContactPage() {
         setFormData({ name: '', email: '', subject: '', message: '' });
       }, 3000);
     } catch (error: unknown) {
-      console.error('Support error:', error);
-      setError(error.message || 'Failed to send message. Please try again.');
-    } finally {
+  console.error("Support error:", error);
+
+  const message =
+    error instanceof Error
+      ? error.message
+      : "Failed to send message. Please try again.";
+
+  setError(message);
+} finally {
       setIsSubmitting(false);
     }
   };

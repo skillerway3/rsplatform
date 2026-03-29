@@ -2,12 +2,23 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { User, Session } from '@supabase/supabase-js';
+import type { User, Session } from '@supabase/supabase-js';
+
+interface Profile {
+  id: string;
+  username: string | null;
+  avatar_url: string | null;
+  is_verified_seller: boolean;
+  is_trusted_seller: boolean;
+  role: string | null;
+  created_at: string | null;
+  username_updated_at: string | null;
+}
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
-  profile: Record<string, unknown> | null;
+  profile: Profile | null;
   loading: boolean;
   isVerifiedSeller: boolean;
   signOut: () => Promise<void>;
@@ -25,44 +36,78 @@ const AuthContext = createContext<AuthContextType>({
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<Record<string, unknown> | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string): Promise<void> => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, username, avatar_url, is_verified_seller, is_trusted_seller, role, created_at, username_updated_at')
+        .select(
+          'id, username, avatar_url, is_verified_seller, is_trusted_seller, role, created_at, username_updated_at'
+        )
         .eq('id', userId)
         .maybeSingle();
-      
+
       if (error) throw error;
-      setProfile(data);
-    } catch (err) {
+
+      const safeProfile: Profile | null = data
+        ? {
+            id: data.id,
+            username: typeof data.username === 'string' ? data.username : null,
+            avatar_url:
+              typeof data.avatar_url === 'string' ? data.avatar_url : null,
+            is_verified_seller: Boolean(data.is_verified_seller),
+            is_trusted_seller: Boolean(data.is_trusted_seller),
+            role: typeof data.role === 'string' ? data.role : null,
+            created_at:
+              typeof data.created_at === 'string' ? data.created_at : null,
+            username_updated_at:
+              typeof data.username_updated_at === 'string'
+                ? data.username_updated_at
+                : null,
+          }
+        : null;
+
+      setProfile(safeProfile);
+    } catch (err: unknown) {
       console.error('Error fetching profile:', err);
+      setProfile(null);
     }
   };
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchProfile(session.user.id);
-      }
-      setLoading(false);
-    });
+    const loadInitialSession = async (): Promise<void> => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
+
       if (session?.user) {
         await fetchProfile(session.user.id);
       } else {
         setProfile(null);
       }
+
+      setLoading(false);
+    };
+
+    void loadInitialSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+
+      if (session?.user) {
+        await fetchProfile(session.user.id);
+      } else {
+        setProfile(null);
+      }
+
       setLoading(false);
     });
 
@@ -71,17 +116,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, []);
 
-  const signOut = async () => {
+  const signOut = async (): Promise<void> => {
     await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
+    setProfile(null);
   };
 
-  const isVerifiedSeller = profile?.is_verified_seller ?? false;
+  const isVerifiedSeller = Boolean(profile?.is_verified_seller);
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, loading, isVerifiedSeller, signOut }}>
+    <AuthContext.Provider
+      value={{ user, session, profile, loading, isVerifiedSeller, signOut }}
+    >
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = (): AuthContextType => useContext(AuthContext);

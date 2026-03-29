@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
 type ConversationRow = {
@@ -14,43 +15,46 @@ type ConversationRow = {
   seller_last_read_at: string | null;
 };
 
-function isUnread(c: ConversationRow, uid: string) {
-  if (!c.last_message_at) return false;
-  if (c.last_message_by === uid) return false;
+function isUnread(conversation: ConversationRow, uid: string): boolean {
+  if (!conversation.last_message_at) return false;
+  if (conversation.last_message_by === uid) return false;
 
-  const last = new Date(c.last_message_at).getTime();
-
+  const lastMessageTime = new Date(conversation.last_message_at).getTime();
   const readAt =
-    c.buyer_id === uid ? c.buyer_last_read_at : c.seller_last_read_at;
+    conversation.buyer_id === uid
+      ? conversation.buyer_last_read_at
+      : conversation.seller_last_read_at;
 
   if (!readAt) return true;
-  return last > new Date(readAt).getTime();
+
+  return lastMessageTime > new Date(readAt).getTime();
 }
 
 export default function NavBar() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [unreadCount, setUnreadCount] = useState<number>(0);
 
-  const uid = useMemo(() => user?.id as string | undefined, [user]);
+  const uid = useMemo(() => user?.id, [user]);
 
-  async function checkUser() {
+  async function checkUser(): Promise<void> {
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
     setUser(user ?? null);
-    if (!user?.id) setUnreadCount(0);
+
+    if (!user?.id) {
+      setUnreadCount(0);
+    }
   }
 
-  async function loadUnread(uid: string) {
-    // ✅ fast: only fetch small set of columns
-    // ✅ limit: don’t fetch huge amounts
+  async function loadUnread(currentUid: string): Promise<void> {
     const { data, error } = await supabase
       .from("conversations")
       .select(
         "id,buyer_id,seller_id,last_message_at,last_message_by,buyer_last_read_at,seller_last_read_at"
       )
-      .or(`buyer_id.eq.${uid},seller_id.eq.${uid}`)
+      .or(`buyer_id.eq.${currentUid},seller_id.eq.${currentUid}`)
       .order("last_message_at", { ascending: false, nullsFirst: false })
       .limit(200);
 
@@ -59,52 +63,63 @@ export default function NavBar() {
       return;
     }
 
-    const rows = (data ?? []) as ConversationRow[];
+    const rows: ConversationRow[] = (data ?? []) as ConversationRow[];
     let count = 0;
-    for (const c of rows) if (isUnread(c, uid)) count++;
+
+    for (const conversation of rows) {
+      if (isUnread(conversation, currentUid)) {
+        count++;
+      }
+    }
+
     setUnreadCount(count);
   }
 
   useEffect(() => {
-    checkUser();
+    void checkUser();
 
-    const { data: listener } = supabase.auth.onAuthStateChange(() => {
-      checkUser();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      void checkUser();
     });
 
     return () => {
-      listener.subscription.unsubscribe();
+      subscription.unsubscribe();
     };
   }, []);
 
-  // When logged in, load unread once, and then refresh on conversation updates
   useEffect(() => {
     if (!uid) return;
 
-    loadUnread(uid);
+    void loadUnread(uid);
 
     const channel = supabase
       .channel(`nav_unread:${uid}`)
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "conversations" },
-        () => loadUnread(uid)
+        () => {
+          void loadUnread(uid);
+        }
       )
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages" },
-        () => loadUnread(uid)
+        () => {
+          void loadUnread(uid);
+        }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
   }, [uid]);
 
-  async function logout() {
+  async function logout(): Promise<void> {
     await supabase.auth.signOut();
-    location.reload();
+    window.location.reload();
   }
 
   return (
@@ -145,16 +160,18 @@ export default function NavBar() {
 
         {!user ? (
           <div className="flex gap-2">
-            <Link href="/login">
-              <button className="px-3 py-2 md:px-4 bg-blue-600 rounded-lg hover:bg-blue-700 transition">
-                Login
-              </button>
+            <Link
+              href="/login"
+              className="px-3 py-2 md:px-4 bg-blue-600 rounded-lg hover:bg-blue-700 transition"
+            >
+              Login
             </Link>
 
-            <Link href="/register">
-              <button className="px-3 py-2 md:px-4 bg-green-600 rounded-lg hover:bg-green-700 transition">
-                Register
-              </button>
+            <Link
+              href="/register"
+              className="px-3 py-2 md:px-4 bg-green-600 rounded-lg hover:bg-green-700 transition"
+            >
+              Register
             </Link>
           </div>
         ) : (
@@ -164,7 +181,9 @@ export default function NavBar() {
             </span>
 
             <button
-              onClick={logout}
+              onClick={() => {
+                void logout();
+              }}
               className="px-3 py-2 md:px-4 bg-red-600 rounded-lg hover:bg-red-700 transition"
             >
               Logout
