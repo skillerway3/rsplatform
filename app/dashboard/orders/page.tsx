@@ -69,13 +69,16 @@ export default function BuyerOrdersPage() {
       // Fetch related data in parallel
       const sellerIds = Array.from(new Set(ordersData.map(o => o.seller_id).filter(Boolean)));
       const listingIds = Array.from(new Set(ordersData.map(o => o.listing_id).filter(Boolean)));
+      const requestIds = Array.from(new Set(ordersData.map(o => o.request_id).filter(Boolean)));
 
       const [
         { data: sellers },
-        { data: listings }
+        { data: listings },
+        { data: requests }
       ] = await Promise.all([
         supabase.from('profiles').select('id, username, avatar_url').in('id', sellerIds),
-        supabase.from('listings').select('id, title, category, images').in('id', listingIds)
+        supabase.from('listings').select('id, title, category, images').in('id', listingIds),
+        supabase.from('buyer_requests').select('id, title, category').in('id', requestIds)
       ]);
 
       // Map related data back to orders
@@ -83,7 +86,8 @@ export default function BuyerOrdersPage() {
         ...order,
         request_id: order.request_id || null,
         seller: sellers?.find(s => s.id === order.seller_id) || { username: 'Unknown', avatar_url: '' },
-        listing: listings?.find(l => l.id === order.listing_id)
+        listing: listings?.find(l => l.id === order.listing_id),
+        request: requests?.find(r => r.id === order.request_id)
       }));
 
       setOrders(enrichedOrders as Order[]);

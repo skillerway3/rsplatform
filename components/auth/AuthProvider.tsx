@@ -147,22 +147,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (isMounted) {
           setSession(initialSession);
           setUser(initialSession?.user ?? null);
+          
+          // Resolve loading state as soon as we have the session/user
+          setLoading(false);
+          console.log('[AuthProvider] Auth initialization complete. User:', initialSession?.user?.id);
 
           if (initialSession?.user) {
-            console.log('[AuthProvider] Initial session found for user:', initialSession.user.id);
-            await fetchProfile(initialSession.user.id, initialSession.user.email);
+            console.log('[AuthProvider] Initial session found, fetching profile...');
+            // Don't await here to avoid blocking initialization
+            void fetchProfile(initialSession.user.id, initialSession.user.email);
           } else {
-            console.log('[AuthProvider] No initial session found');
             setProfile(null);
           }
         }
       } catch (err) {
         console.error('[AuthProvider] Unexpected error during auth initialization:', err);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-          console.log('[AuthProvider] Auth initialization complete. Loading state:', false);
-        }
+        if (isMounted) setLoading(false);
       }
     };
 
@@ -176,20 +176,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('[AuthProvider] Auth state changed:', event, session?.user?.id);
       
       if (isMounted) {
-        try {
-          setSession(session);
-          setUser(session?.user ?? null);
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        // Ensure loading is false on any auth state change
+        setLoading(false);
 
-          if (session?.user) {
-            await fetchProfile(session.user.id, session.user.email);
-          } else {
-            setProfile(null);
-          }
-        } catch (err) {
-          console.error('[AuthProvider] Error in onAuthStateChange:', err);
-        } finally {
-          // Always ensure loading is false after an auth state change
-          setLoading(false);
+        if (session?.user) {
+          // Fetch profile in background
+          void fetchProfile(session.user.id, session.user.email);
+        } else {
+          setProfile(null);
         }
       }
     });
@@ -201,25 +198,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const signOut = async (): Promise<void> => {
-    console.log('[AuthProvider] Signing out...');
     try {
-      // Clear state immediately for better UX
-      setUser(null);
-      setSession(null);
-      setProfile(null);
-      
       const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('[AuthProvider] Supabase signOut error:', error);
-      }
-    } catch (err) {
-      console.error('[AuthProvider] Unexpected error during signOut:', err);
-    } finally {
-      // Ensure state is cleared even if signOut fails
+      if (error) throw error;
+      
+      // Clear state only after confirmed success
       setUser(null);
       setSession(null);
       setProfile(null);
-      console.log('[AuthProvider] Sign out complete');
+    } catch (err) {
+      console.error('[AuthProvider] Sign out error:', err);
+      throw err;
     }
   };
 

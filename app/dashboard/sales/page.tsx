@@ -74,7 +74,7 @@ export default function SellerSalesPage() {
       ] = await Promise.all([
         supabase.from('profiles').select('id, username, avatar_url').in('id', buyerIds),
         supabase.from('listings').select('id, title, category').in('id', listingIds),
-        supabase.from('requests').select('id, title, category').in('id', requestIds)
+        supabase.from('buyer_requests').select('id, title, category').in('id', requestIds)
       ]);
 
       // Map related data back to orders

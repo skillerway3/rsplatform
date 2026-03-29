@@ -202,7 +202,7 @@ export default function MyOffersPage() {
                       <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Sent On</p>
                       <p className="text-sm font-black text-white">{formatDate(offer.created_at)}</p>
                     </div>
-                    <Link href={`/marketplace/request/${offer.request_id}`}>
+                    <Link href={`/marketplace/requests/${offer.request_id}`}>
                       <Button variant="outline" size="sm" className="rounded-xl text-[9px] font-black uppercase tracking-widest h-10 px-6">
                         View Request
                       </Button>

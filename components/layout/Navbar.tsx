@@ -35,13 +35,12 @@ export function Navbar() {
 
   const handleLogout = async () => {
     try {
-      console.log('[Navbar] Logout clicked');
       setIsProfileOpen(false);
       setIsMobileMenuOpen(false);
       await signOut();
-      toast.success('Successfully logged out');
-      console.log('[Navbar] Sign out complete, redirecting...');
-      router.push('/');
+      toast.success('You logged out successfully');
+      router.replace('/');
+      router.refresh();
     } catch (error) {
       console.error('[Navbar] Logout error:', error);
       toast.error('Failed to logout');

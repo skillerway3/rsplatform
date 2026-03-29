@@ -2,7 +2,8 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   ShieldCheck, 
   Lock, 
@@ -21,8 +22,9 @@ import { supabase } from '@/lib/supabase';
 
 import { toast } from 'sonner';
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [loading, setLoading] = React.useState(false);
@@ -30,10 +32,11 @@ export default function LoginPage() {
 
   const handleSocialLogin = async (provider: 'google') => {
     try {
+      const next = searchParams.get('next') || '/dashboard';
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/dashboard`,
+          redirectTo: `${window.location.origin}${next}`,
         },
       });
       if (error) throw error;
@@ -57,7 +60,8 @@ export default function LoginPage() {
       if (authError) throw authError;
 
       toast.success('Successfully logged in!');
-      router.push('/');
+      const next = searchParams.get('next') || '/';
+      router.replace(next);
       router.refresh();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to sign in';
@@ -200,5 +204,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-zinc-950 flex items-center justify-center"><Loader2 className="w-8 h-8 text-amber-500 animate-spin" /></div>}>
+      <LoginContent />
+    </Suspense>
   );
 }
