@@ -124,6 +124,9 @@ export default function SellerVerifyPage() {
 
       if (insertError) {
         console.error('Error inserting verification record:', insertError);
+        if (insertError.code === '42P01') {
+          throw new Error('Database table "seller_verifications" not found. Please contact support.');
+        }
         throw insertError;
       }
 

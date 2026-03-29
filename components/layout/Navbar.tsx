@@ -13,6 +13,8 @@ import { useNotifications } from '@/components/providers/NotificationProvider';
 import { NotificationDropdown } from '@/components/layout/NotificationDropdown';
 import Image from 'next/image';
 
+import { toast } from 'sonner';
+
 export function Navbar() {
   const { user, profile, signOut, isVerifiedSeller } = useAuth();
   useNotifications();
@@ -24,6 +26,27 @@ export function Navbar() {
   const [activeDropdown, setActiveDropdown] = React.useState<string | null>(null);
   const [activeMobileAccordion, setActiveMobileAccordion] = React.useState<string | null>(null);
   const [isProfileOpen, setIsProfileOpen] = React.useState(false);
+
+  // Close dropdowns on route change
+  React.useEffect(() => {
+    setIsProfileOpen(false);
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
+
+  const handleLogout = async () => {
+    try {
+      console.log('[Navbar] Logout clicked');
+      setIsProfileOpen(false);
+      setIsMobileMenuOpen(false);
+      await signOut();
+      toast.success('Successfully logged out');
+      console.log('[Navbar] Sign out complete, redirecting...');
+      router.push('/');
+    } catch (error) {
+      console.error('[Navbar] Logout error:', error);
+      toast.error('Failed to logout');
+    }
+  };
 
   React.useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
@@ -289,13 +312,7 @@ export function Navbar() {
                           </>
                         )}
                         <button
-                          onClick={async () => {
-                            console.log('[Navbar] Logout clicked');
-                            setIsProfileOpen(false);
-                            await signOut();
-                            console.log('[Navbar] Sign out complete, redirecting...');
-                            router.push('/');
-                          }}
+                          onClick={handleLogout}
                           className="w-full flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-500/5 transition-all"
                         >
                           <LogOut className="w-4 h-4" />
@@ -471,11 +488,7 @@ export function Navbar() {
                     </Button>
                   </Link>
                   <button 
-                    onClick={async () => {
-                      await signOut();
-                      setIsMobileMenuOpen(false);
-                      router.push('/');
-                    }}
+                    onClick={handleLogout}
                     className="px-6 py-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-500 font-black uppercase tracking-widest text-[10px] hover:bg-red-500/20 transition-all"
                   >
                     <LogOut className="w-5 h-5" />

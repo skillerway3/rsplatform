@@ -37,6 +37,8 @@ export const metadata: Metadata = {
   }
 };
 
+import { Toaster } from 'sonner';
+
 export default function RootLayout({
   children,
 }: {
@@ -45,6 +47,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="font-sans bg-zinc-950 text-zinc-100 antialiased">
+        <Toaster position="top-center" richColors theme="dark" closeButton />
         <AuthProvider>
           <NotificationProvider>
             <PayPalProvider>

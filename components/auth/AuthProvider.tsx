@@ -114,7 +114,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           }
         : null;
 
-      setProfile(safeProfile);
+      // Only update if profile data has actually changed to avoid re-render loops
+      setProfile((current) => {
+        if (JSON.stringify(current) === JSON.stringify(safeProfile)) {
+          return current;
+        }
+        return safeProfile;
+      });
       console.log('[AuthProvider] Profile fetched successfully');
     } catch (err: unknown) {
       console.error('[AuthProvider] Unexpected error in fetchProfile:', err);
@@ -125,19 +131,52 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     let isMounted = true;
 
-    const loadInitialSession = async (): Promise<void> => {
-      console.log('[AuthProvider] Loading initial session...');
+    const initializeAuth = async () => {
+      console.log('[AuthProvider] Initializing auth...');
       try {
+        // 1. Get initial session
         const {
-          data: { session },
-          error
+          data: { session: initialSession },
+          error: sessionError
         } = await supabase.auth.getSession();
 
-        if (error) {
-          console.error('[AuthProvider] Error getting session:', error);
+        if (sessionError) {
+          console.error('[AuthProvider] Error getting initial session:', sessionError);
         }
 
         if (isMounted) {
+          setSession(initialSession);
+          setUser(initialSession?.user ?? null);
+
+          if (initialSession?.user) {
+            console.log('[AuthProvider] Initial session found for user:', initialSession.user.id);
+            await fetchProfile(initialSession.user.id, initialSession.user.email);
+          } else {
+            console.log('[AuthProvider] No initial session found');
+            setProfile(null);
+          }
+        }
+      } catch (err) {
+        console.error('[AuthProvider] Unexpected error during auth initialization:', err);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+          console.log('[AuthProvider] Auth initialization complete. Loading state:', false);
+        }
+      }
+    };
+
+    // Start initialization
+    void initializeAuth();
+
+    // 2. Listen for auth state changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[AuthProvider] Auth state changed:', event, session?.user?.id);
+      
+      if (isMounted) {
+        try {
           setSession(session);
           setUser(session?.user ?? null);
 
@@ -146,35 +185,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           } else {
             setProfile(null);
           }
-        }
-      } catch (err) {
-        console.error('[AuthProvider] Unexpected error in loadInitialSession:', err);
-      } finally {
-        if (isMounted) {
+        } catch (err) {
+          console.error('[AuthProvider] Error in onAuthStateChange:', err);
+        } finally {
+          // Always ensure loading is false after an auth state change
           setLoading(false);
-          console.log('[AuthProvider] Initial session load complete');
         }
-      }
-    };
-
-    void loadInitialSession();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('[AuthProvider] Auth state changed:', event);
-      
-      if (isMounted) {
-        setSession(session);
-        setUser(session?.user ?? null);
-
-        if (session?.user) {
-          await fetchProfile(session.user.id, session.user.email);
-        } else {
-          setProfile(null);
-        }
-        
-        setLoading(false);
       }
     });
 
@@ -209,10 +225,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const isVerifiedSeller = Boolean(profile?.is_verified_seller);
 
+  const value = React.useMemo(() => ({
+    user,
+    session,
+    profile,
+    loading,
+    isVerifiedSeller,
+    signOut
+  }), [user, session, profile, loading, isVerifiedSeller]);
+
   return (
-    <AuthContext.Provider
-      value={{ user, session, profile, loading, isVerifiedSeller, signOut }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

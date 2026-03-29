@@ -57,54 +57,39 @@ export default function ProfilePage() {
   const [uploading, setUploading] = React.useState(false);
 
   React.useEffect(() => {
-    console.log('[ProfilePage] useEffect triggered:', { authLoading, userId: user?.id, authProfileId: authProfile?.id });
+    console.log('[ProfilePage] useEffect triggered:', { 
+      authLoading, 
+      userId: user?.id, 
+      authProfileId: authProfile?.id
+    });
     
     if (authLoading) return;
 
     if (!user) {
-      console.log('[ProfilePage] No user, redirecting to login');
+      console.log('[ProfilePage] No user found, redirecting to login');
       router.push("/login");
       return;
     }
 
+    // If we have a profile from AuthProvider that matches our user, use it
     if (authProfile && authProfile.id === user.id) {
       console.log('[ProfilePage] Using profile from AuthProvider');
-      const profileData: Profile = {
-        id: authProfile.id,
-        username:
-          typeof authProfile.username === "string" ? authProfile.username : null,
-        avatar_url:
-          typeof authProfile.avatar_url === "string" ? authProfile.avatar_url : null,
-        is_verified_seller: Boolean(authProfile.is_verified_seller),
-        is_trusted_seller: Boolean(authProfile.is_trusted_seller),
-        created_at:
-          typeof authProfile.created_at === "string"
-            ? authProfile.created_at
-            : new Date().toISOString(),
-        username_updated_at:
-          typeof authProfile.username_updated_at === "string"
-            ? authProfile.username_updated_at
-            : null,
-        role: typeof authProfile.role === "string" ? authProfile.role : null,
-      };
-
-      setProfile(profileData);
-      setUsername(profileData.username ?? "");
+      setProfile(authProfile);
+      setUsername(authProfile.username ?? "");
       setLoading(false);
       return;
     }
 
+    // Otherwise fetch it manually
     const fetchProfile = async () => {
-      console.log('[ProfilePage] Fetching profile manually...');
+      console.log('[ProfilePage] Fetching profile manually for user:', user.id);
       try {
         setLoading(true);
         setError(null);
 
         const { data, error } = await supabase
           .from("profiles")
-          .select(
-            "id, username, avatar_url, is_verified_seller, is_trusted_seller, created_at, role, username_updated_at"
-          )
+          .select("*")
           .eq("id", user.id)
           .maybeSingle();
 
@@ -122,10 +107,10 @@ export default function ProfilePage() {
         const fetchedProfile = data as Profile;
         setProfile(fetchedProfile);
         setUsername(fetchedProfile.username ?? "");
-        console.log('[ProfilePage] Profile fetched successfully');
+        console.log('[ProfilePage] Profile fetched successfully manually');
       } catch (err: unknown) {
         console.error("[ProfilePage] Unexpected error fetching profile:", err);
-        setError("Failed to load profile");
+        setError("Failed to load profile. Please try refreshing the page.");
       } finally {
         setLoading(false);
       }

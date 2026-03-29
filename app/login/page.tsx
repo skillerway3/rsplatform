@@ -19,6 +19,8 @@ import { Input } from '@/components/ui/Input';
 
 import { supabase } from '@/lib/supabase';
 
+import { toast } from 'sonner';
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = React.useState('');
@@ -37,6 +39,7 @@ export default function LoginPage() {
       if (error) throw error;
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : `Failed to sign in with ${provider}`);
+      toast.error(err instanceof Error ? err.message : `Failed to sign in with ${provider}`);
     }
   };
 
@@ -53,10 +56,13 @@ export default function LoginPage() {
 
       if (authError) throw authError;
 
-      router.push('/sell');
+      toast.success('Successfully logged in!');
+      router.push('/');
       router.refresh();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to sign in');
+      const message = err instanceof Error ? err.message : 'Failed to sign in';
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
