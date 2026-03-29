@@ -1,5 +1,8 @@
 'use client';
 
+import { logSupabaseError } from '@/lib/error-utils';
+
+// ... (keep other imports)
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -33,7 +36,7 @@ interface Order {
     id: string;
     title: string;
     category: string;
-    images: string[];
+    images?: string[];
   };
   request?: {
     id: string;
@@ -53,10 +56,10 @@ export default function BuyerOrdersPage() {
     if (!user) return;
     try {
       setLoading(true);
-      // Simplified query: Fetch orders first, then related data to avoid complex joins
+      // Use select('*') to avoid crashing on missing columns (schema drift)
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
-        .select('id, total_price, status, created_at, seller_id, listing_id, request_id')
+        .select('*')
         .eq('buyer_id', user.id)
         .order('created_at', { ascending: false });
 
@@ -72,18 +75,23 @@ export default function BuyerOrdersPage() {
       const requestIds = Array.from(new Set(ordersData.map(o => o.request_id).filter(Boolean)));
 
       const [
-        { data: sellers },
-        { data: listings },
-        { data: requests }
+        { data: sellers, error: sErr },
+        { data: listings, error: lErr },
+        { data: requests, error: rErr }
       ] = await Promise.all([
         supabase.from('profiles').select('id, username, avatar_url').in('id', sellerIds),
-        supabase.from('listings').select('id, title, category, images').in('id', listingIds),
+        supabase.from('listings').select('id, title, category').in('id', listingIds),
         supabase.from('buyer_requests').select('id, title, category').in('id', requestIds)
       ]);
+
+      if (sErr) console.error('Orders: Sellers fetch error:', sErr);
+      if (lErr) console.error('Orders: Listings fetch error:', lErr);
+      if (rErr) console.error('Orders: Requests fetch error:', rErr);
 
       // Map related data back to orders
       const enrichedOrders = ordersData.map(order => ({
         ...order,
+        total_price: order.total_price || order.amount || 0,
         request_id: order.request_id || null,
         seller: sellers?.find(s => s.id === order.seller_id) || { username: 'Unknown', avatar_url: '' },
         listing: listings?.find(l => l.id === order.listing_id),
@@ -92,8 +100,8 @@ export default function BuyerOrdersPage() {
 
       setOrders(enrichedOrders as Order[]);
     } catch (err: unknown) {
-      console.error('Error fetching orders:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch orders');
+      const msg = logSupabaseError('fetchOrders', err);
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -174,7 +182,7 @@ export default function BuyerOrdersPage() {
                             <div className="relative w-14 h-14 rounded-2xl overflow-hidden border border-white/10 bg-zinc-950 shrink-0 group-hover:scale-110 transition-transform duration-500">
                               {(Array.isArray(order.listing) ? order.listing[0]?.images?.[0] : order.listing?.images?.[0]) ? (
                                 <Image 
-                                  src={Array.isArray(order.listing) ? order.listing[0].images[0] : order.listing!.images[0]} 
+                                  src={Array.isArray(order.listing) ? order.listing[0].images![0] : order.listing!.images![0]} 
                                   alt={Array.isArray(order.listing) ? order.listing[0].title : order.listing!.title} 
                                   fill 
                                   className="object-cover"

@@ -1,5 +1,8 @@
 'use client';
 
+import { logSupabaseError } from '@/lib/error-utils';
+
+// ... (keep other imports)
 import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -49,10 +52,10 @@ export default function SellerSalesPage() {
     if (!user) return;
     try {
       setLoading(true);
-      // Corrected query: Use total_price, platform_fee, seller_payout, and request_id
+      // Use select('*') to avoid crashing on missing columns (schema drift)
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
-        .select('id, total_price, platform_fee, seller_payout, status, created_at, buyer_id, listing_id, request_id')
+        .select('*')
         .eq('seller_id', user.id)
         .order('created_at', { ascending: false });
 
@@ -68,18 +71,26 @@ export default function SellerSalesPage() {
       const requestIds = Array.from(new Set(ordersData.map(o => o.request_id).filter(Boolean)));
 
       const [
-        { data: buyers },
-        { data: listings },
-        { data: requests }
+        { data: buyers, error: bErr },
+        { data: listings, error: lErr },
+        { data: requests, error: rErr }
       ] = await Promise.all([
         supabase.from('profiles').select('id, username, avatar_url').in('id', buyerIds),
         supabase.from('listings').select('id, title, category').in('id', listingIds),
         supabase.from('buyer_requests').select('id, title, category').in('id', requestIds)
       ]);
 
+      if (bErr) console.error('Sales: Buyers fetch error:', bErr);
+      if (lErr) console.error('Sales: Listings fetch error:', lErr);
+      if (rErr) console.error('Sales: Requests fetch error:', rErr);
+
       // Map related data back to orders
       const enrichedOrders = ordersData.map(order => ({
         ...order,
+        total_price: order.total_price || order.amount || 0,
+        platform_fee: order.platform_fee || 0,
+        seller_payout: order.seller_payout || 0,
+        request_id: order.request_id || null,
         buyer: buyers?.find(b => b.id === order.buyer_id) || { username: 'Unknown', avatar_url: '' },
         listing: listings?.find(l => l.id === order.listing_id),
         request: requests?.find(r => r.id === order.request_id)
@@ -87,7 +98,8 @@ export default function SellerSalesPage() {
 
       setOrders(enrichedOrders as Order[]);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch sales');
+      const msg = logSupabaseError('fetchSales', err);
+      setError(msg);
     } finally {
       setLoading(false);
     }

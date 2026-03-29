@@ -1,5 +1,8 @@
 'use client';
 
+import { logSupabaseError } from '@/lib/error-utils';
+
+// ... (keep other imports)
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -31,7 +34,7 @@ interface Listing {
   created_at: string;
   game: string;
   category: string;
-  images: string[];
+  images?: string[];
 }
 
 export default function MyListingsPage() {
@@ -48,17 +51,24 @@ export default function MyListingsPage() {
     if (!user) return;
     try {
       setLoading(true);
+      setError(null);
+      
+      // We remove 'images' from the select because it's missing in the current DB schema.
+      // If the migration is run, you can add 'images' back to this select.
       const { data, error } = await supabase
         .from('listings')
-        .select('id, title, price, status, created_at, game, category, images')
+        .select('id, title, price, status, created_at, game, category')
         .eq('seller_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
+      
       setListings(data || []);
     } catch (err: unknown) {
-      console.error('Error fetching listings:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch listings');
+      const msg = logSupabaseError('fetchListings', err);
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -83,8 +93,8 @@ export default function MyListingsPage() {
       if (error) throw error;
       setListings(prev => prev.map(l => l.id === id ? { ...l, status } : l));
     } catch (err: unknown) {
-      console.error('Error updating status:', err);
-      setError('Failed to update status');
+      const msg = logSupabaseError('updateStatus', err);
+      setError(msg);
     }
   };
 
@@ -99,8 +109,8 @@ export default function MyListingsPage() {
       setListings(prev => prev.filter(l => l.id !== id));
       setListingToDelete(null);
     } catch (err: unknown) {
-      console.error('Error deleting listing:', err);
-      setError('Failed to delete listing');
+      const msg = logSupabaseError('deleteListing', err);
+      setError(msg);
     }
   };
 

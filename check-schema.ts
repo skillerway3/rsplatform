@@ -13,17 +13,6 @@ async function check() {
   });
   const data = await res.json();
   
-  const tables = Object.keys(data.definitions);
-  console.log('Tables:', tables);
-  if (data.definitions.support_messages) {
-    console.log('support_messages:', data.definitions.support_messages.properties);
-  }
-  if (data.definitions.support_threads) {
-    console.log('support_threads:', data.definitions.support_threads.properties);
-  }
-  if (data.definitions.seller_reviews) {
-    console.log('seller_reviews:', data.definitions.seller_reviews.properties);
-  }
   if (data.definitions.listings) {
     console.log('listings:', data.definitions.listings.properties);
   }

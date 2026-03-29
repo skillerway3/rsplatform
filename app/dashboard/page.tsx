@@ -1,5 +1,7 @@
 "use client";
 
+import { logSupabaseError } from '@/lib/error-utils';
+
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -60,7 +62,8 @@ interface ListingRow {
 
 interface OrderRow {
   id: string;
-  total_price: number | null;
+  total_price?: number | null;
+  amount?: number | null;
   created_at: string;
   status: string | null;
   listing_id: string | null;
@@ -162,21 +165,27 @@ export default function DashboardPage() {
             .eq("seller_id", user.id),
           supabase
             .from("orders")
-            .select("id, total_price, created_at, status, listing_id")
+            .select("*")
             .eq("buyer_id", user.id)
             .order("created_at", { ascending: false })
             .limit(5),
           supabase
             .from("orders")
-            .select("id, total_price, created_at, status, listing_id")
+            .select("*")
             .eq("seller_id", user.id)
             .order("created_at", { ascending: false })
             .limit(5),
           supabase.from("buyer_requests").select("id").eq("buyer_id", user.id),
         ]);
 
+        if (lErr) console.error("[DashboardPage] Listings fetch error:", lErr);
+        if (oErr) console.error("[DashboardPage] Orders fetch error:", oErr);
+        if (sErr) console.error("[DashboardPage] Sales fetch error:", sErr);
+        if (rErr) console.error("[DashboardPage] Requests fetch error:", rErr);
+
         if (lErr || oErr || sErr || rErr) {
-          throw new Error("Failed to fetch dashboard statistics");
+          const firstErr = lErr || oErr || sErr || rErr;
+          throw firstErr;
         }
 
         const safeListings = ((listings ?? []) as ListingRow[]).map(
@@ -232,7 +241,7 @@ export default function DashboardPage() {
             id: order.id,
             createdAt: order.created_at,
             type: "purchase" as const,
-            amount: Number(order.total_price ?? 0),
+            amount: Number(order.total_price || order.amount || 0),
             title:
               (order.listing_id && listingTitles[order.listing_id]) || "Purchase",
           })),
@@ -240,7 +249,7 @@ export default function DashboardPage() {
             id: sale.id,
             createdAt: sale.created_at,
             type: "sale" as const,
-            amount: Number(sale.total_price ?? 0),
+            amount: Number(sale.total_price || sale.amount || 0),
             title: (sale.listing_id && listingTitles[sale.listing_id]) || "Sale",
           })),
         ]
@@ -253,7 +262,7 @@ export default function DashboardPage() {
         setRecentOrders(allActivities);
 
         const totalRev = completedSales.reduce(
-          (acc, sale) => acc + Number(sale.total_price ?? 0),
+          (acc, sale) => acc + Number(sale.total_price || sale.amount || 0),
           0
         );
 
@@ -274,7 +283,7 @@ export default function DashboardPage() {
           const dayIndex = last7Days.findIndex((day) => day.date === saleDate);
 
           if (dayIndex !== -1) {
-            last7Days[dayIndex].value += Number(sale.total_price ?? 0);
+            last7Days[dayIndex].value += Number(sale.total_price || sale.amount || 0);
           }
         });
 
@@ -289,10 +298,8 @@ export default function DashboardPage() {
           unreadMessages: 0,
         });
       } catch (err: unknown) {
-        const errorMessage =
-          err instanceof Error ? err.message : "Failed to load dashboard data";
-        console.error("Error fetching dashboard data:", err);
-        setError(errorMessage);
+        const msg = logSupabaseError('fetchDashboardData', err);
+        setError(msg);
       } finally {
         setLoading(false);
       }
