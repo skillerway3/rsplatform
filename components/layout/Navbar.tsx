@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ShieldCheck, MessageSquare, User, Menu, X, PlusCircle, ChevronDown, LogOut, LayoutDashboard, Zap, BadgeCheck, DollarSign, ShoppingBag } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, isAdmin } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { motion, AnimatePresence } from 'motion/react';
 import { NAV_SECTIONS } from '@/data/navigation';
@@ -12,7 +12,6 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { useNotifications } from '@/components/providers/NotificationProvider';
 import { NotificationDropdown } from '@/components/layout/NotificationDropdown';
 import Image from 'next/image';
-
 import { toast } from 'sonner';
 
 export function Navbar() {
@@ -27,7 +26,6 @@ export function Navbar() {
   const [activeMobileAccordion, setActiveMobileAccordion] = React.useState<string | null>(null);
   const [isProfileOpen, setIsProfileOpen] = React.useState(false);
 
-  // Close dropdowns on route change
   React.useEffect(() => {
     setIsProfileOpen(false);
     setIsMobileMenuOpen(false);
@@ -53,7 +51,6 @@ export function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Close dropdown on click outside
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (activeDropdown && !(event.target as HTMLElement).closest('.nav-dropdown-container')) {
@@ -90,7 +87,6 @@ export function Navbar() {
           </span>
         </Link>
 
-        {/* Desktop Nav */}
         <nav className="hidden md:flex items-center space-x-10">
           {NAV_SECTIONS.map((section) => {
             const isActive = searchParams.get('section') === section.id;
@@ -105,15 +101,19 @@ export function Navbar() {
                 >
                   <span className="relative">
                     {section.name}
-                    <span className={cn(
-                      "absolute -bottom-1 left-0 w-0 h-[1px] bg-amber-500 transition-all duration-300",
-                      (activeDropdown === section.id || isActive) && "w-full"
-                    )} />
+                    <span
+                      className={cn(
+                        'absolute -bottom-1 left-0 w-0 h-[1px] bg-amber-500 transition-all duration-300',
+                        (activeDropdown === section.id || isActive) && 'w-full'
+                      )}
+                    />
                   </span>
-                  <ChevronDown className={cn(
-                    "w-3 h-3 transition-transform duration-500 ease-out",
-                    activeDropdown === section.id ? "rotate-180 text-amber-500" : "text-zinc-400 group-hover:text-amber-500"
-                  )} />
+                  <ChevronDown
+                    className={cn(
+                      'w-3 h-3 transition-transform duration-500 ease-out',
+                      activeDropdown === section.id ? 'rotate-180 text-amber-500' : 'text-zinc-400 group-hover:text-amber-500'
+                    )}
+                  />
                 </button>
 
                 <AnimatePresence>
@@ -122,7 +122,7 @@ export function Navbar() {
                       initial={{ opacity: 0, y: 15, scale: 0.98 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.98 }}
-                      transition={{ duration: 0.25, ease: "easeOut" }}
+                      transition={{ duration: 0.25, ease: 'easeOut' }}
                       className="absolute top-full left-1/2 -translate-x-1/2 mt-4 w-56 bg-zinc-950 border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden py-3 z-[60]"
                     >
                       <div className="px-4 py-2 mb-2 border-b border-white/5">
@@ -135,15 +135,19 @@ export function Navbar() {
                             key={game.id}
                             onClick={() => handleNavClick(section.id, game.id)}
                             className={cn(
-                              "w-full text-left px-5 py-3.5 text-[10px] font-black uppercase tracking-widest transition-all duration-300 flex items-center justify-between group/item",
-                              isGameActive ? "text-amber-500 bg-amber-500/5" : "text-zinc-400 hover:text-white hover:bg-white/5"
+                              'w-full text-left px-5 py-3.5 text-[10px] font-black uppercase tracking-widest transition-all duration-300 flex items-center justify-between group/item',
+                              isGameActive ? 'text-amber-500 bg-amber-500/5' : 'text-zinc-400 hover:text-white hover:bg-white/5'
                             )}
                           >
                             <span>{game.name}</span>
-                            <div className={cn(
-                              "w-1 h-1 rounded-full transition-all duration-300",
-                              isGameActive ? "bg-amber-500 scale-125 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "bg-transparent group-hover/item:bg-zinc-700"
-                            )} />
+                            <div
+                              className={cn(
+                                'w-1 h-1 rounded-full transition-all duration-300',
+                                isGameActive
+                                  ? 'bg-amber-500 scale-125 shadow-[0_0_8px_rgba(245,158,11,0.5)]'
+                                  : 'bg-transparent group-hover/item:bg-zinc-700'
+                              )}
+                            />
                           </button>
                         );
                       })}
@@ -153,6 +157,7 @@ export function Navbar() {
               </div>
             );
           })}
+
           <Link
             href="/support"
             className={cn(
@@ -161,10 +166,12 @@ export function Navbar() {
             )}
           >
             <span>Contact Us</span>
-            <span className={cn(
-              "absolute -bottom-1 left-0 w-0 h-[1px] bg-amber-500 transition-all duration-300 group-hover:w-full",
-              pathname === '/support' && "w-full"
-            )} />
+            <span
+              className={cn(
+                'absolute -bottom-1 left-0 w-0 h-[1px] bg-amber-500 transition-all duration-300 group-hover:w-full',
+                pathname === '/support' && 'w-full'
+              )}
+            />
           </Link>
         </nav>
 
@@ -173,15 +180,15 @@ export function Navbar() {
             <Link href="/messages" className="p-2 text-zinc-100 hover:text-amber-500 transition-colors relative">
               <MessageSquare className="w-5 h-5" />
             </Link>
-            
+
             <NotificationDropdown />
-            
+
             <div className="relative profile-dropdown-container">
-              <button 
+              <button
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
                 className={cn(
-                  "p-1 transition-colors rounded-xl border border-transparent",
-                  isProfileOpen ? "text-amber-500 bg-amber-500/10 border-amber-500/20" : "text-zinc-100 hover:text-amber-500"
+                  'p-1 transition-colors rounded-xl border border-transparent',
+                  isProfileOpen ? 'text-amber-500 bg-amber-500/10 border-amber-500/20' : 'text-zinc-100 hover:text-amber-500'
                 )}
               >
                 {profile?.avatar_url ? (
@@ -201,7 +208,7 @@ export function Navbar() {
                     initial={{ opacity: 0, y: 15, scale: 0.98 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.98 }}
-                    transition={{ duration: 0.25, ease: "easeOut" }}
+                    transition={{ duration: 0.25, ease: 'easeOut' }}
                     className="absolute top-full right-0 mt-4 w-64 bg-zinc-950 border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden py-3 z-[60]"
                   >
                     {user ? (
@@ -222,11 +229,11 @@ export function Navbar() {
                                 {profile?.username || 'Member'}
                               </p>
                               <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-[0.2em] truncate">
-                                {profile?.role === 'admin' ? 'Administrator' : 'Member'}
+                                {isAdmin(user, profile) ? 'Administrator' : 'Member'}
                               </p>
                             </div>
                           </div>
-                          
+
                           <div className="flex flex-wrap gap-1.5">
                             {isVerifiedSeller && (
                               <div className="flex items-center gap-1 px-1.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md">
@@ -242,6 +249,7 @@ export function Navbar() {
                             )}
                           </div>
                         </div>
+
                         <Link
                           href="/profile"
                           className="flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
@@ -250,6 +258,7 @@ export function Navbar() {
                           <User className="w-4 h-4" />
                           My Profile
                         </Link>
+
                         <Link
                           href="/dashboard"
                           className="flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
@@ -258,6 +267,7 @@ export function Navbar() {
                           <LayoutDashboard className="w-4 h-4" />
                           Dashboard
                         </Link>
+
                         <Link
                           href="/dashboard/orders"
                           className="flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
@@ -266,6 +276,7 @@ export function Navbar() {
                           <ShoppingBag className="w-4 h-4" />
                           My Orders
                         </Link>
+
                         <Link
                           href="/dashboard/my-listings"
                           className="flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
@@ -274,6 +285,7 @@ export function Navbar() {
                           <PlusCircle className="w-4 h-4" />
                           My Listings
                         </Link>
+
                         <Link
                           href="/dashboard/sales"
                           className="flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
@@ -282,6 +294,7 @@ export function Navbar() {
                           <DollarSign className="w-4 h-4" />
                           My Sales
                         </Link>
+
                         <Link
                           href="/dashboard/offers"
                           className="flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
@@ -290,8 +303,20 @@ export function Navbar() {
                           <Zap className="w-4 h-4" />
                           My Offers
                         </Link>
-                        {profile?.role === 'admin' && (
+
+                        {isAdmin(user, profile) && (
                           <>
+                            <div className="mx-5 my-2 border-t border-white/5" />
+
+                            <Link
+                              href="/admin"
+                              className="flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-amber-500 hover:bg-amber-500/5 transition-all"
+                              onClick={() => setIsProfileOpen(false)}
+                            >
+                              <LayoutDashboard className="w-4 h-4" />
+                              Admin Dashboard
+                            </Link>
+
                             <Link
                               href="/admin/verifications"
                               className="flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-amber-500 hover:bg-amber-500/5 transition-all"
@@ -300,6 +325,7 @@ export function Navbar() {
                               <ShieldCheck className="w-4 h-4" />
                               Admin Verifications
                             </Link>
+
                             <Link
                               href="/admin/sellers"
                               className="flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-amber-500 hover:bg-amber-500/5 transition-all"
@@ -310,6 +336,7 @@ export function Navbar() {
                             </Link>
                           </>
                         )}
+
                         <button
                           onClick={handleLogout}
                           className="w-full flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-500/5 transition-all"
@@ -346,7 +373,7 @@ export function Navbar() {
               </AnimatePresence>
             </div>
           </div>
-          
+
           <Link href="/sell">
             <Button variant="gold" size="sm" className="rounded-xl px-6 font-black uppercase tracking-widest text-[10px] h-11">
               <PlusCircle className="w-4 h-4 mr-2" />
@@ -355,7 +382,6 @@ export function Navbar() {
           </Link>
         </div>
 
-        {/* Mobile Header Actions */}
         <div className="flex md:hidden items-center space-x-2">
           {user ? (
             <>
@@ -369,8 +395,7 @@ export function Navbar() {
               <User className="w-5 h-5" />
             </Link>
           )}
-          
-          {/* Mobile Menu Toggle */}
+
           <button
             className="p-2 text-zinc-400 hover:text-white"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -380,7 +405,6 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* Mobile Menu */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <motion.div
@@ -397,13 +421,19 @@ export function Navbar() {
                     <button
                       onClick={() => setActiveMobileAccordion(activeMobileAccordion === section.id ? null : section.id)}
                       className={cn(
-                        "flex items-center justify-between w-full text-lg font-black uppercase tracking-widest py-4 transition-colors",
-                        activeMobileAccordion === section.id || isActive ? "text-amber-500" : "text-zinc-100"
+                        'flex items-center justify-between w-full text-lg font-black uppercase tracking-widest py-4 transition-colors',
+                        activeMobileAccordion === section.id || isActive ? 'text-amber-500' : 'text-zinc-100'
                       )}
                     >
                       <span>{section.name}</span>
-                      <ChevronDown className={cn("w-5 h-5 transition-transform duration-500", activeMobileAccordion === section.id && "rotate-180")} />
+                      <ChevronDown
+                        className={cn(
+                          'w-5 h-5 transition-transform duration-500',
+                          activeMobileAccordion === section.id && 'rotate-180'
+                        )}
+                      />
                     </button>
+
                     <AnimatePresence>
                       {activeMobileAccordion === section.id && (
                         <motion.div
@@ -419,14 +449,16 @@ export function Navbar() {
                                 key={game.id}
                                 onClick={() => handleNavClick(section.id, game.id)}
                                 className={cn(
-                                  "text-left py-3 text-sm font-black uppercase tracking-widest transition-colors flex items-center space-x-3",
-                                  isGameActive ? "text-amber-500" : "text-zinc-500"
+                                  'text-left py-3 text-sm font-black uppercase tracking-widest transition-colors flex items-center space-x-3',
+                                  isGameActive ? 'text-amber-500' : 'text-zinc-500'
                                 )}
                               >
-                                <div className={cn(
-                                  "w-1.5 h-[1px] transition-all",
-                                  isGameActive ? "w-4 bg-amber-500" : "bg-zinc-800"
-                                )} />
+                                <div
+                                  className={cn(
+                                    'w-1.5 h-[1px] transition-all',
+                                    isGameActive ? 'w-4 bg-amber-500' : 'bg-zinc-800'
+                                  )}
+                                />
                                 <span>{game.name}</span>
                               </button>
                             );
@@ -437,12 +469,12 @@ export function Navbar() {
                   </div>
                 );
               })}
-              
+
               <Link
                 href="/support"
                 className={cn(
-                  "text-lg font-black uppercase tracking-widest py-4 border-b border-white/5",
-                  pathname === '/support' ? "text-amber-500" : "text-zinc-100"
+                  'text-lg font-black uppercase tracking-widest py-4 border-b border-white/5',
+                  pathname === '/support' ? 'text-amber-500' : 'text-zinc-100'
                 )}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
@@ -451,42 +483,53 @@ export function Navbar() {
 
               <div className="pt-8 flex flex-col space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <Link 
-                    href="/dashboard/orders" 
+                  <Link
+                    href="/dashboard/orders"
                     className="flex items-center justify-center py-4 bg-zinc-900 rounded-xl text-zinc-400 font-black uppercase tracking-widest text-[10px] border border-white/5"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     My Orders
                   </Link>
-                  <Link 
-                    href="/dashboard/sales" 
+                  <Link
+                    href="/dashboard/sales"
                     className="flex items-center justify-center py-4 bg-zinc-900 rounded-xl text-zinc-400 font-black uppercase tracking-widest text-[10px] border border-white/5"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     My Sales
                   </Link>
-                  <Link 
-                    href="/messages" 
+                  <Link
+                    href="/messages"
                     className="flex items-center justify-center py-4 bg-zinc-900 rounded-xl text-zinc-400 font-black uppercase tracking-widest text-[10px] border border-white/5"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Messages
                   </Link>
-                  <Link 
-                    href="/profile" 
+                  <Link
+                    href="/profile"
                     className="flex items-center justify-center py-4 bg-zinc-900 rounded-xl text-zinc-400 font-black uppercase tracking-widest text-[10px] border border-white/5"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Profile
                   </Link>
                 </div>
+
+                {isAdmin(user, profile) && (
+                  <Link
+                    href="/admin"
+                    className="flex items-center justify-center py-4 bg-amber-500/10 rounded-xl text-amber-500 font-black uppercase tracking-widest text-[10px] border border-amber-500/20"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Admin Dashboard
+                  </Link>
+                )}
+
                 <div className="flex gap-4">
                   <Link href="/sell" className="flex-1">
                     <Button variant="gold" className="w-full py-7 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-amber-500/10">
                       List Item
                     </Button>
                   </Link>
-                  <button 
+                  <button
                     onClick={handleLogout}
                     className="px-6 py-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-500 font-black uppercase tracking-widest text-[10px] hover:bg-red-500/20 transition-all"
                   >

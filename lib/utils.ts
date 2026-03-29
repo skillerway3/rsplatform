@@ -21,6 +21,13 @@ export function formatDate(date: string | Date) {
   });
 }
 
+export function isAdmin(user: { email?: string } | null | undefined, profile: { role?: string | null } | null | undefined) {
+  if (!user) return false;
+  if (user.email === 'skillerway100@gmail.com') return true;
+  if (profile?.role === 'admin') return true;
+  return false;
+}
+
 export function getListingSection(listing: Listing): SectionId | null {
   if (listing.sectionId) return listing.sectionId;
   

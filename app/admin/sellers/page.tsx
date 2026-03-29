@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { supabase } from '@/lib/supabase';
 import Image from 'next/image';
-import { cn } from '@/lib/utils';
+import { cn, isAdmin } from '@/lib/utils';
 
 interface Profile {
   id: string;
@@ -35,7 +35,7 @@ export default function AdminSellersPage() {
   const router = useRouter();
   const [profiles, setProfiles] = React.useState<Profile[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [isAdmin, setIsAdmin] = React.useState(false);
+  const [isUserAdmin, setIsUserAdmin] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [processingId, setProcessingId] = React.useState<string | null>(null);
 
@@ -65,8 +65,8 @@ export default function AdminSellersPage() {
       .eq('id', user.id)
       .single();
 
-    if (profile?.role === 'admin') {
-      setIsAdmin(true);
+    if (isAdmin(user, profile)) {
+      setIsUserAdmin(true);
       fetchProfiles();
     } else {
       router.push('/');
@@ -111,7 +111,7 @@ export default function AdminSellersPage() {
     p.id.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (!isAdmin) return null;
+  if (!isUserAdmin) return null;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 p-8 pt-32">

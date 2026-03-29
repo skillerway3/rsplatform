@@ -28,7 +28,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/lib/supabase";
-import { formatDate, cn } from "@/lib/utils";
+import { formatDate, cn, isAdmin } from "@/lib/utils";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -315,7 +315,7 @@ export default function ProfilePage() {
                     {profile?.username ?? "Member"}
                   </h2>
                   <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">
-                    {profile?.role === "admin" ? "Administrator" : "Member"}
+                    {isAdmin(user, profile) ? "Administrator" : "Member"}
                   </p>
                 </div>
 
@@ -407,7 +407,7 @@ export default function ProfilePage() {
                         Account Status
                       </p>
                       <p className="text-[11px] font-bold text-zinc-100 truncate max-w-[150px]">
-                        {profile?.role === "admin"
+                        {isAdmin(user, profile)
                           ? "Administrator"
                           : "Verified Member"}
                       </p>
@@ -559,7 +559,7 @@ export default function ProfilePage() {
                         Account Status
                       </label>
                       <div className="w-full bg-zinc-950/30 border border-zinc-800/50 rounded-2xl px-6 h-14 flex items-center text-sm font-bold text-zinc-500 cursor-not-allowed">
-                        {profile?.role === "admin"
+                        {isAdmin(user, profile)
                           ? "Administrator"
                           : "Verified Member"}
                       </div>

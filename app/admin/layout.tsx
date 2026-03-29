@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Button } from '@/components/ui/Button';
-import { cn } from '@/lib/utils';
+import { cn, isAdmin } from '@/lib/utils';
 
 const ADMIN_NAV = [
   { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
@@ -40,9 +40,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { user, profile, loading } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
 
-  const isAdminEmail = user?.email === 'skillerway100@gmail.com';
-  const isAdminRole = profile?.role === 'admin';
-
   if (loading) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
@@ -51,7 +48,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  if (!user || (!isAdminEmail && !isAdminRole)) {
+  if (!user || !isAdmin(user, profile)) {
     return (
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6 text-center">
         <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mb-6 border border-red-500/20">
