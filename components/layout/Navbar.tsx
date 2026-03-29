@@ -163,7 +163,7 @@ export function Navbar() {
                 )}
               >
                 {profile?.avatar_url ? (
-                  <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10">
+                  <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10 relative">
                     <Image src={profile.avatar_url} alt="Profile" fill className="object-cover" />
                   </div>
                 ) : (
@@ -186,7 +186,7 @@ export function Navbar() {
                       <>
                         <div className="px-5 py-4 border-b border-white/5 mb-2 bg-white/5">
                           <div className="flex items-center gap-3 mb-3">
-                            <div className="w-10 h-10 rounded-xl overflow-hidden border border-white/10 bg-zinc-900 shrink-0">
+                            <div className="w-10 h-10 rounded-xl overflow-hidden border border-white/10 bg-zinc-900 shrink-0 relative">
                               {profile?.avatar_url ? (
                                 <Image src={profile.avatar_url} alt="Avatar" fill className="object-cover" />
                               ) : (
@@ -289,9 +289,10 @@ export function Navbar() {
                           </>
                         )}
                         <button
-                          onClick={() => {
-                            signOut();
+                          onClick={async () => {
+                            await signOut();
                             setIsProfileOpen(false);
+                            router.push('/');
                           }}
                           className="w-full flex items-center gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-500/5 transition-all"
                         >
@@ -468,9 +469,10 @@ export function Navbar() {
                     </Button>
                   </Link>
                   <button 
-                    onClick={() => {
-                      signOut();
+                    onClick={async () => {
+                      await signOut();
                       setIsMobileMenuOpen(false);
+                      router.push('/');
                     }}
                     className="px-6 py-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-500 font-black uppercase tracking-widest text-[10px] hover:bg-red-500/20 transition-all"
                   >

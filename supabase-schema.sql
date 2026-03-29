@@ -9,9 +9,21 @@ CREATE TABLE IF NOT EXISTS profiles (
   average_rating NUMERIC DEFAULT 0,
   review_count INTEGER DEFAULT 0,
   manual_trusted_override BOOLEAN DEFAULT FALSE,
+  role TEXT DEFAULT 'user',
   username_updated_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Function to check if a user is an admin
+CREATE OR REPLACE FUNCTION public.is_admin(user_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = user_id AND role = 'admin'
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Trigger to enforce 30-day username change restriction and prevent reserved usernames
 CREATE OR REPLACE FUNCTION public.check_username_update()

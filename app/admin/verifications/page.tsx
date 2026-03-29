@@ -8,7 +8,7 @@ import {
   FileText,
   UserCheck
 } from 'lucide-react';
-import { createClient, supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
@@ -32,7 +32,6 @@ export default function AdminVerificationPage() {
   const [filter, setFilter] = React.useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
 
   React.useEffect(() => {
-    const supabase = createClient();
     async function fetchVerifications() {
       try {
         let query = supabase.from('seller_verifications').select(`
@@ -58,7 +57,6 @@ export default function AdminVerificationPage() {
   }, [filter]);
 
   const handleUpdateStatus = async (id: string, userId: string, status: 'approved' | 'rejected') => {
-    const supabase = createClient();
     try {
       const { data: { user: adminUser } } = await supabase.auth.getUser();
       const { error: verifyError } = await supabase.from('seller_verifications').update({ 

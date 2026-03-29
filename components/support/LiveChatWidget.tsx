@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/Button';
-import { createClient } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/components/auth/AuthProvider';
 
@@ -158,7 +158,6 @@ export function LiveChatWidget() {
   const [guestInfo, setGuestInfo] = useState({ name: '', email: '' });
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const supabase = createClient();
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -237,7 +236,7 @@ export function LiveChatWidget() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [threadId, step, supabase]);
+  }, [threadId, step]);
 
   const resetChat = () => {
     setStep('welcome');

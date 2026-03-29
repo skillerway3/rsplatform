@@ -32,9 +32,9 @@ type NotificationRow = {
   user_id: string;
   type: string | null;
   title: string | null;
-  message: string | null;
+  content: string | null;
   link: string | null;
-  read: boolean | null;
+  is_read: boolean | null;
   created_at: string | null;
 };
 
@@ -47,9 +47,9 @@ function mapNotificationRow(row: NotificationRow): Notification {
     id: String(row.id),
     type: row.type ?? '',
     title: row.title ?? '',
-    content: row.message ?? '',
+    content: row.content ?? '',
     link: row.link ?? undefined,
-    is_read: Boolean(row.read),
+    is_read: Boolean(row.is_read),
     created_at: row.created_at ?? '',
   };
 }
@@ -106,7 +106,7 @@ export function NotificationProvider({
 
     const { data, error } = await supabase
       .from('notifications')
-      .select('id, user_id, type, title, message, link, read, created_at')
+      .select('id, user_id, type, title, content, link, is_read, created_at')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -151,7 +151,7 @@ export function NotificationProvider({
   const markAsRead = async (id: string) => {
     const { error } = await supabase
       .from('notifications')
-      .update({ read: true })
+      .update({ is_read: true })
       .eq('id', id);
 
     if (!error) {
@@ -166,9 +166,9 @@ export function NotificationProvider({
 
     const { error } = await supabase
       .from('notifications')
-      .update({ read: true })
+      .update({ is_read: true })
       .eq('user_id', user.id)
-      .eq('read', false);
+      .eq('is_read', false);
 
     if (!error) {
       setNotifications((prev) =>

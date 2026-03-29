@@ -19,7 +19,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { createClient } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -58,7 +58,6 @@ interface DashboardStats {
 }
 
 export default function AdminDashboardPage() {
-  const supabase = createClient();
   const [stats, setStats] = React.useState<DashboardStats | null>(null);
   const [loading, setLoading] = React.useState(true);
 
@@ -126,7 +125,7 @@ export default function AdminDashboardPage() {
     }
 
     fetchStats();
-  }, [supabase]);
+  }, []);
 
   if (loading) {
     return (
