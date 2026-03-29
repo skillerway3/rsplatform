@@ -32,13 +32,13 @@ import { formatDate, cn } from "@/lib/utils";
 import Link from "next/link";
 import Image from "next/image";
 
-interface Profile {
+interface PageProfile {
   id: string;
   username: string | null;
   avatar_url: string | null;
   is_verified_seller: boolean;
   is_trusted_seller: boolean;
-  created_at: string;
+  created_at: string | null;
   username_updated_at?: string | null;
   role: string | null;
 }
@@ -47,7 +47,7 @@ export default function ProfilePage() {
   const { user, profile: authProfile, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  const [profile, setProfile] = React.useState<Profile | null>(null);
+  const [profile, setProfile] = React.useState<PageProfile | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [updating, setUpdating] = React.useState(false);
   const [username, setUsername] = React.useState("");
@@ -57,57 +57,80 @@ export default function ProfilePage() {
   const [uploading, setUploading] = React.useState(false);
 
   React.useEffect(() => {
-    console.log('[ProfilePage] useEffect triggered:', { 
-      authLoading, 
-      userId: user?.id, 
-      authProfileId: authProfile?.id
+    console.log("[ProfilePage] useEffect triggered:", {
+      authLoading,
+      userId: user?.id,
+      authProfileId: authProfile?.id,
     });
-    
+
     if (authLoading) return;
 
     if (!user) {
-      console.log('[ProfilePage] No user found, redirecting to login');
+      console.log("[ProfilePage] No user found, redirecting to login");
       router.push("/login");
       return;
     }
 
-    // If we have a profile from AuthProvider that matches our user, use it
     if (authProfile && authProfile.id === user.id) {
-      console.log('[ProfilePage] Using profile from AuthProvider');
-      setProfile(authProfile);
-      setUsername(authProfile.username ?? "");
+      console.log("[ProfilePage] Using profile from AuthProvider");
+
+      const normalizedProfile: PageProfile = {
+        id: authProfile.id,
+        username: authProfile.username ?? null,
+        avatar_url: authProfile.avatar_url ?? null,
+        is_verified_seller: Boolean(authProfile.is_verified_seller),
+        is_trusted_seller: Boolean(authProfile.is_trusted_seller),
+        created_at: authProfile.created_at ?? null,
+        username_updated_at: authProfile.username_updated_at ?? null,
+        role: authProfile.role ?? null,
+      };
+
+      setProfile(normalizedProfile);
+      setUsername(normalizedProfile.username ?? "");
       setLoading(false);
       return;
     }
 
-    // Otherwise fetch it manually
     const fetchProfile = async () => {
-      console.log('[ProfilePage] Fetching profile manually for user:', user.id);
+      console.log("[ProfilePage] Fetching profile manually for user:", user.id);
+
       try {
         setLoading(true);
         setError(null);
 
         const { data, error } = await supabase
           .from("profiles")
-          .select("*")
+          .select(
+            "id, username, avatar_url, is_verified_seller, is_trusted_seller, created_at, username_updated_at, role"
+          )
           .eq("id", user.id)
           .maybeSingle();
 
         if (error) {
-          console.error('[ProfilePage] Error fetching profile:', error);
+          console.error("[ProfilePage] Error fetching profile:", error);
           throw error;
         }
 
         if (!data) {
-          console.error('[ProfilePage] Profile not found for user:', user.id);
+          console.error("[ProfilePage] Profile not found for user:", user.id);
           setError("Profile not found. Please try refreshing the page.");
           return;
         }
 
-        const fetchedProfile = data as Profile;
+        const fetchedProfile: PageProfile = {
+          id: data.id,
+          username: data.username ?? null,
+          avatar_url: data.avatar_url ?? null,
+          is_verified_seller: Boolean(data.is_verified_seller),
+          is_trusted_seller: Boolean(data.is_trusted_seller),
+          created_at: data.created_at ?? null,
+          username_updated_at: data.username_updated_at ?? null,
+          role: data.role ?? null,
+        };
+
         setProfile(fetchedProfile);
         setUsername(fetchedProfile.username ?? "");
-        console.log('[ProfilePage] Profile fetched successfully manually');
+        console.log("[ProfilePage] Profile fetched successfully manually");
       } catch (err: unknown) {
         console.error("[ProfilePage] Unexpected error fetching profile:", err);
         setError("Failed to load profile. Please try refreshing the page.");
