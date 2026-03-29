@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (userId: string): Promise<void> => {
+  const fetchProfile = async (userId: string, userEmail?: string): Promise<void> => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -50,6 +50,43 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .maybeSingle();
 
       if (error) throw error;
+
+      if (!data) {
+        // Profile doesn't exist, create one
+        const newUsername = userEmail 
+          ? userEmail.split('@')[0] + Math.floor(Math.random() * 1000)
+          : 'user_' + userId.substring(0, 8);
+        
+        const { data: newData, error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: userId,
+            username: newUsername,
+            avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`,
+            role: 'user'
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error('Error creating profile:', insertError);
+          setProfile(null);
+          return;
+        }
+
+        const safeProfile: Profile = {
+          id: newData.id,
+          username: typeof newData.username === 'string' ? newData.username : null,
+          avatar_url: typeof newData.avatar_url === 'string' ? newData.avatar_url : null,
+          is_verified_seller: Boolean(newData.is_verified_seller),
+          is_trusted_seller: Boolean(newData.is_trusted_seller),
+          role: typeof newData.role === 'string' ? newData.role : null,
+          created_at: typeof newData.created_at === 'string' ? newData.created_at : null,
+          username_updated_at: typeof newData.username_updated_at === 'string' ? newData.username_updated_at : null,
+        };
+        setProfile(safeProfile);
+        return;
+      }
 
       const safeProfile: Profile | null = data
         ? {
@@ -86,7 +123,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(session?.user ?? null);
 
       if (session?.user) {
-        await fetchProfile(session.user.id);
+        await fetchProfile(session.user.id, session.user.email);
       } else {
         setProfile(null);
       }
@@ -103,7 +140,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(session?.user ?? null);
 
       if (session?.user) {
-        await fetchProfile(session.user.id);
+        await fetchProfile(session.user.id, session.user.email);
       } else {
         setProfile(null);
       }

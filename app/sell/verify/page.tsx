@@ -106,17 +106,20 @@ export default function SellerVerifyPage() {
         uploadFile(files.selfie, 'selfie'),
       ]);
 
-      // Create verification record
+      // Create or update verification record
       const { error: insertError } = await supabase
         .from('seller_verifications')
-        .insert({
+        .upsert({
           user_id: user.id,
           phone_number: phoneNumber,
           document_type: documentType,
           id_front_url: idFrontPath,
           id_back_url: idBackPath,
           selfie_url: selfiePath,
-          status: 'pending'
+          status: 'pending',
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id'
         });
 
       if (insertError) {

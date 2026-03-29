@@ -101,9 +101,14 @@ export default function ProfilePage() {
             "id, username, avatar_url, is_verified_seller, is_trusted_seller, created_at, role, username_updated_at"
           )
           .eq("id", user.id)
-          .single();
+          .maybeSingle();
 
         if (error) throw error;
+
+        if (!data) {
+          setError("Profile not found. Please try refreshing the page.");
+          return;
+        }
 
         const fetchedProfile = data as Profile;
         setProfile(fetchedProfile);

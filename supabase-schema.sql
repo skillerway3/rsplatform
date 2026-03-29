@@ -341,6 +341,8 @@ CREATE POLICY "Users can view own verification" ON seller_verifications FOR SELE
 );
 DROP POLICY IF EXISTS "Users can insert own verification" ON seller_verifications;
 CREATE POLICY "Users can insert own verification" ON seller_verifications FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own verification" ON seller_verifications;
+CREATE POLICY "Users can update own verification" ON seller_verifications FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 DROP POLICY IF EXISTS "Admins can update verifications" ON seller_verifications;
 CREATE POLICY "Admins can update verifications" ON seller_verifications FOR UPDATE USING (
   is_admin(auth.uid())

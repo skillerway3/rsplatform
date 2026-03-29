@@ -131,9 +131,13 @@ export default function DashboardPage() {
             .from("profiles")
             .select("id, username, is_verified_seller, is_trusted_seller")
             .eq("id", user.id)
-            .single();
+            .maybeSingle();
 
           if (pError) throw pError;
+
+          if (!pData) {
+            throw new Error("Profile not found");
+          }
 
           currentProfile = normalizeDashboardProfile(pData);
         }
