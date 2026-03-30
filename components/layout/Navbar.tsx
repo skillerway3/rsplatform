@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ShieldCheck, MessageSquare, User, Menu, X, PlusCircle, ChevronDown, LogOut, LayoutDashboard, Zap, BadgeCheck, DollarSign, ShoppingBag } from 'lucide-react';
-import { cn, isAdmin } from '@/lib/utils';
+import { cn, isAdmin, getUserStatus } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { motion, AnimatePresence } from 'motion/react';
 import { NAV_SECTIONS } from '@/data/navigation';
@@ -222,7 +222,7 @@ export function Navbar() {
                                 {profile?.username || 'Member'}
                               </p>
                               <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-[0.2em] truncate">
-                                {isAdmin(user, profile) ? 'Administrator' : 'Member'}
+                                {getUserStatus(user, profile)}
                               </p>
                             </div>
                           </div>
@@ -363,6 +363,15 @@ export function Navbar() {
                 <MessageSquare className="w-5 h-5" />
               </Link>
               <NotificationDropdown />
+              <Link href="/profile" className="p-2 text-zinc-100 hover:text-amber-500 transition-colors">
+                {profile?.avatar_url ? (
+                  <div className="w-6 h-6 rounded-md overflow-hidden border border-white/10 relative">
+                    <Image src={profile.avatar_url} alt="Profile" fill className="object-cover" />
+                  </div>
+                ) : (
+                  <User className="w-5 h-5" />
+                )}
+              </Link>
             </>
           ) : (
             <Link href="/login" className="p-2 text-zinc-100 hover:text-amber-500 transition-colors">

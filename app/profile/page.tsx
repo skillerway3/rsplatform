@@ -28,7 +28,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/lib/supabase";
-import { formatDate, cn, isAdmin } from "@/lib/utils";
+import { formatDate, cn, getUserStatus } from "@/lib/utils";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -144,7 +144,7 @@ export default function ProfilePage() {
       const message =
         err instanceof Error
           ? err.message
-          : "Failed to update profile. Username might be taken.";
+          : (err as { message?: string })?.message || "Failed to update profile. Username might be taken.";
 
       setError(
         message.includes("30 days")
@@ -315,7 +315,7 @@ export default function ProfilePage() {
                     {profile?.username ?? "Member"}
                   </h2>
                   <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">
-                    {isAdmin(user, profile) ? "Administrator" : "Member"}
+                    {getUserStatus(user, profile)}
                   </p>
                 </div>
 
@@ -407,9 +407,7 @@ export default function ProfilePage() {
                         Account Status
                       </p>
                       <p className="text-[11px] font-bold text-zinc-100 truncate max-w-[150px]">
-                        {isAdmin(user, profile)
-                          ? "Administrator"
-                          : "Verified Member"}
+                        {getUserStatus(user, profile)}
                       </p>
                     </div>
                   </div>
@@ -550,7 +548,7 @@ export default function ProfilePage() {
                         className="w-full bg-zinc-950/50 border border-zinc-800 rounded-2xl px-6 h-14 text-sm font-bold text-white focus:outline-none focus:border-amber-500/50 transition-colors"
                       />
                       <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest ml-1">
-                        This is your public display name.
+                        This is your public display name. You can only change your username once every 30 days.
                       </p>
                     </div>
 
@@ -559,9 +557,7 @@ export default function ProfilePage() {
                         Account Status
                       </label>
                       <div className="w-full bg-zinc-950/30 border border-zinc-800/50 rounded-2xl px-6 h-14 flex items-center text-sm font-bold text-zinc-500 cursor-not-allowed">
-                        {isAdmin(user, profile)
-                          ? "Administrator"
-                          : "Verified Member"}
+                        {getUserStatus(user, profile)}
                       </div>
                     </div>
                   </div>

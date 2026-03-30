@@ -28,6 +28,14 @@ export function isAdmin(user: { email?: string } | null | undefined, profile: { 
   return false;
 }
 
+export function getUserStatus(user: { email_confirmed_at?: string | null, email?: string } | null | undefined, profile: { role?: string | null, is_trusted_seller?: boolean, is_verified_seller?: boolean } | null | undefined) {
+  if (isAdmin(user, profile)) return "Administrator";
+  if (profile?.is_trusted_seller) return "Trusted Seller";
+  if (profile?.is_verified_seller) return "Verified Seller";
+  if (user?.email_confirmed_at) return "Email Verified Member";
+  return "Unverified Member";
+}
+
 export async function getUserEmail(userId: string) {
   try {
     const response = await fetch(`/api/admin/users?id=${userId}`);
