@@ -98,7 +98,7 @@ export default function AdminDashboardPage() {
           supabase.from('admin_activity_logs').select('id, action, entity_type, created_at, admin_id').order('created_at', { ascending: false }).limit(5)
         ]);
 
-        const totalRevenue = revenueData?.reduce((acc, curr) => acc + (Number(curr.total_price) * 0.1 || 0), 0) || 0;
+        const totalRevenue = revenueData?.reduce((acc, curr) => acc + (Number(curr.total_price) * 0.05 || 0), 0) || 0;
 
         setStats({
           totalUsers: usersCount || 0,

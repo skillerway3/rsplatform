@@ -59,6 +59,7 @@ interface Listing {
   price: number;
   game: string;
   category: string;
+  images: string[];
   seller_id: string;
   created_at: string;
   gameId: string;
@@ -114,7 +115,7 @@ export default function ListingDetailPage() {
         // Fetch listing first
         const { data: listingData, error: fetchError } = await supabase
           .from('listings')
-          .select('id, title, description, price, game, category, status, seller_id, created_at, metadata')
+          .select('id, title, description, price, game, category, status, seller_id, created_at, metadata, images')
           .eq('id', id)
           .single();
 
@@ -210,10 +211,20 @@ export default function ListingDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-16">
           {/* Left Column: Media & Details */}
           <div className="lg:col-span-8 space-y-16">
-            {/* Image Gallery Placeholder */}
+            {/* Image Gallery */}
             <div className="space-y-6">
               <div className="aspect-video relative rounded-[2rem] overflow-hidden border border-white/5 bg-zinc-900/50 shadow-2xl group flex items-center justify-center">
-                <Package className="w-24 h-24 text-zinc-800" />
+                {listing.images && listing.images.length > 0 ? (
+                  <Image 
+                    src={listing.images[0]} 
+                    alt={listing.title} 
+                    fill 
+                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <Package className="w-24 h-24 text-zinc-800" />
+                )}
                 <div className="absolute top-8 left-8 flex space-x-3">
                   <Badge variant="gold" className="px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] shadow-xl">
                     {listing.gameId}
@@ -223,6 +234,22 @@ export default function ListingDetailPage() {
                   </Badge>
                 </div>
               </div>
+
+              {listing.images && listing.images.length > 1 && (
+                <div className="grid grid-cols-4 gap-4">
+                  {listing.images.slice(1, 5).map((img, i) => (
+                    <div key={i} className="aspect-square relative rounded-2xl overflow-hidden border border-white/5 bg-zinc-900/50 hover:border-amber-500/50 transition-colors cursor-pointer group">
+                      <Image 
+                        src={img} 
+                        alt={`${listing.title} ${i + 2}`} 
+                        fill 
+                        className="object-cover transition-transform duration-500 group-hover:scale-110"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Title & Description */}

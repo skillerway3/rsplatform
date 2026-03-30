@@ -55,7 +55,6 @@ export interface Listing {
   isFeatured?: boolean;
   createdAt: string;
   metadata?: AccountMetadata | Record<string, unknown>;
-  accountMetadata?: AccountMetadata;
   seller?: User;
 }
 
@@ -63,7 +62,6 @@ export interface AccountListing extends Listing {
   sectionId: 'accounts';
   categoryId: 'accounts';
   metadata?: AccountMetadata;
-  accountMetadata?: AccountMetadata;
 }
 
 export function isAccountListing(listing: Listing): listing is AccountListing {
@@ -80,13 +78,43 @@ export interface Order {
   createdAt: string;
 }
 
+export interface ConversationPerson {
+  username: string | null;
+  avatar_url: string | null;
+}
+
+export interface ConversationListing {
+  title: string | null;
+}
+
+export interface Conversation {
+  id: string;
+  buyer_id: string;
+  seller_id: string;
+  listing_id?: string | null;
+  last_message_at?: string | null;
+  buyer_last_read_at?: string | null;
+  seller_last_read_at?: string | null;
+  last_message_by?: string | null;
+  buyer?: ConversationPerson | null;
+  seller?: ConversationPerson | null;
+  listing?: ConversationListing | null;
+  other_person?: ConversationPerson | null;
+}
+
 export interface Message {
   id: string;
-  senderId: string;
-  receiverId: string;
   content: string;
-  createdAt: string;
-  isRead: boolean;
+
+  senderId?: string;
+  receiverId?: string;
+  createdAt?: string;
+  isRead?: boolean;
+
+  conversation_id?: string;
+  sender_id?: string;
+  created_at?: string;
+  is_read?: boolean | null;
 }
 
 export interface SupportTicket {

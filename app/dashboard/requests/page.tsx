@@ -19,6 +19,7 @@ import {
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import Link from 'next/link';
+import { toast } from 'sonner';
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
 
 interface Offer {
@@ -163,6 +164,48 @@ export default function BuyerRequestsPage() {
     } catch (err: unknown) {
       console.error('Error closing request:', err);
       setError(err instanceof Error ? err.message : 'Failed to close request');
+    }
+  };
+
+  const handleStartChat = async (sellerId: string) => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    try {
+      // 1) find existing conversation
+      const { data: existing, error: findErr } = await supabase
+        .from('conversations')
+        .select('id')
+        .or(`and(buyer_id.eq.${user.id},seller_id.eq.${sellerId}),and(buyer_id.eq.${sellerId},seller_id.eq.${user.id})`)
+        .is('listing_id', null)
+        .limit(1)
+        .maybeSingle();
+
+      if (findErr) throw findErr;
+
+      if (existing?.id) {
+        router.push(`/messages?chat=${existing.id}`);
+        return;
+      }
+
+      // 2) create new conversation
+      const { data: created, error: createErr } = await supabase
+        .from('conversations')
+        .insert({
+          buyer_id: user.id,
+          seller_id: sellerId,
+          listing_id: null
+        })
+        .select('id')
+        .single();
+
+      if (createErr) throw createErr;
+      router.push(`/messages?chat=${created.id}`);
+    } catch (err) {
+      console.error('Error starting chat:', err);
+      toast.error('Failed to start conversation');
     }
   };
 
@@ -314,12 +357,12 @@ export default function BuyerRequestsPage() {
                                   >
                                     View & Pay
                                   </Link>
-                                  <Link 
-                                    href={`/messages?seller=${offer.seller_id}&request=${req.id}`}
+                                  <button 
+                                    onClick={() => handleStartChat(offer.seller_id)}
                                     className="p-3 bg-white/5 text-zinc-400 border border-white/10 rounded-xl hover:text-white hover:bg-white/10 transition-all"
                                   >
                                     <MessageSquare className="w-5 h-5" />
-                                  </Link>
+                                  </button>
                                 </>
                               ) : offer.status === 'accepted' ? (
                                 <div className="flex items-center gap-2 text-emerald-500 font-black uppercase tracking-widest text-[10px] w-full justify-center md:justify-end">

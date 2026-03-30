@@ -198,7 +198,7 @@ export default function PublicProfilePage() {
       if (findErr) throw findErr;
 
       if (existing) {
-        router.push(`/chat/${existing.id}`);
+        router.push(`/messages?chat=${existing.id}`);
         return;
       }
 
@@ -214,7 +214,7 @@ export default function PublicProfilePage() {
 
       if (createErr) throw createErr;
 
-      router.push(`/chat/${created.id}`);
+      router.push(`/messages?chat=${created.id}`);
     } catch (err: unknown) {
       console.error("Error starting chat:", err);
       alert("Failed to start conversation");

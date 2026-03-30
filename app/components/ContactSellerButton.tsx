@@ -51,7 +51,7 @@ export default function ContactSellerButton({ listingId, sellerId }: Props) {
 
     if (existing?.id) {
       setLoading(false);
-      router.push(`/chat/${existing.id}`);
+      router.push(`/messages?chat=${existing.id}`);
       return;
     }
 
@@ -74,7 +74,7 @@ export default function ContactSellerButton({ listingId, sellerId }: Props) {
     }
 
     setLoading(false);
-    router.push(`/chat/${created.id}`);
+    router.push(`/messages?chat=${created.id}`);
   }
 
   return (

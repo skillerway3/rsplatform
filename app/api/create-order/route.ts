@@ -134,10 +134,15 @@ export async function POST(req: Request) {
     }
 
     // 7. Create order in Supabase
+    const platformFee = Number((price * 0.05).toFixed(2));
+    const sellerPayout = Number((price - platformFee).toFixed(2));
+
     const orderData: Record<string, unknown> = {
       buyer_id: user.id,
       seller_id: sellerId,
       total_price: price,
+      platform_fee: platformFee,
+      seller_payout: sellerPayout,
       status: 'processing',
       paypal_order_id: paymentId,
       currency: 'USD'
