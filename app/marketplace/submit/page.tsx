@@ -6,7 +6,6 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Zap, ShieldCheck, ArrowRight, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { createNotification } from '@/lib/notifications';
 
 export default function SubmitRequestPage() {
   const { user, loading: authLoading } = useAuth();
@@ -73,28 +72,32 @@ export default function SubmitRequestPage() {
 
       setSuccess(true);
       
-      // Notify all verified sellers about the new request
+      // Notify all verified sellers about the new request via server-side API
       try {
-        const { data: sellers } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('is_verified_seller', true);
-
-        if (sellers && sellers.length > 0) {
-          const notificationPromises = sellers.map(seller => 
-            createNotification({
-              userId: seller.id,
-              type: 'system',
-              title: 'New Buyer Request',
-              content: `A new request for ${formData.game} (${formData.category}) has been posted: "${formData.title}"`,
-              link: `/marketplace/requests/${data.id}`
-            })
-          );
-          await Promise.all(notificationPromises);
+        const notifyRes = await fetch('/api/notifications', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'buyer_request_fanout',
+            requestId: data.id,
+            title: formData.title,
+            game: formData.game,
+            category: formData.category,
+            buyerId: user.id
+          })
+        });
+        
+        if (!notifyRes.ok) {
+          const errorData = await notifyRes.json();
+          console.warn('Seller notification fanout failed:', errorData.error);
+        } else {
+          const notifyData = await notifyRes.json();
+          if (!notifyData.success) {
+            console.warn('Seller notification fanout was not successful:', notifyData.error);
+          }
         }
       } catch (notifyErr) {
         console.error('Error notifying sellers:', notifyErr);
-        // Don't block the user if notifications fail
       }
 
       // Redirect immediately to avoid "freeze" feeling

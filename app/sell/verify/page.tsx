@@ -30,6 +30,7 @@ export default function SellerVerifyPage() {
 
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [adminNotificationFailed, setAdminNotificationFailed] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -130,9 +131,10 @@ export default function SellerVerifyPage() {
         throw insertError;
       }
 
-      // Send admin notification
+      // Notify Admin (Best effort)
+      let adminFailed = false;
       try {
-        await fetch('/api/notify-admin', {
+        const notifyRes = await fetch('/api/notify-admin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -141,8 +143,31 @@ export default function SellerVerifyPage() {
             email: user.email
           })
         });
+        
+        if (!notifyRes.ok) {
+          const errorData = await notifyRes.json();
+          console.warn('Admin notification API returned error:', errorData);
+          adminFailed = true;
+        } else {
+          const data = await notifyRes.json();
+          if (!data.success) {
+            console.warn('Admin notification failed:', data.error);
+            adminFailed = true;
+          } else {
+            console.log('Admin notification status:', {
+              inApp: data.inAppNotificationCreated,
+              email: data.emailSent,
+              emailSkipped: data.emailSkipped
+            });
+          }
+        }
       } catch (notifyErr) {
-        console.error('Failed to notify admin:', notifyErr);
+        console.error('Failed to call notify-admin API:', notifyErr);
+        adminFailed = true;
+      }
+
+      if (adminFailed) {
+        setAdminNotificationFailed(true);
       }
 
       console.log('Verification application submitted successfully');
@@ -152,7 +177,7 @@ export default function SellerVerifyPage() {
       // Redirect after a short delay to show success message
       setTimeout(() => {
         router.replace('/sell/verify/pending');
-      }, 1500);
+      }, adminFailed ? 4000 : 1500);
     } catch (err: unknown) {
       console.error('Error submitting verification:', err);
       setError('Failed to submit verification. Please try again later or contact support if the issue persists.');
@@ -249,6 +274,13 @@ export default function SellerVerifyPage() {
             <div className="mb-8 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center gap-3 text-emerald-500 text-[10px] font-black uppercase tracking-widest">
               <CheckCircle2 className="w-4 h-4" />
               Application submitted successfully! Redirecting...
+            </div>
+          )}
+
+          {adminNotificationFailed && (
+            <div className="mb-8 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center gap-3 text-amber-500 text-[10px] font-black uppercase tracking-widest">
+              <AlertCircle className="w-4 h-4" />
+              Verification submitted, but admin notification had an issue. Please check admin panel or server logs.
             </div>
           )}
 

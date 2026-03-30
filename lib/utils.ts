@@ -28,6 +28,18 @@ export function isAdmin(user: { email?: string } | null | undefined, profile: { 
   return false;
 }
 
+export async function getUserEmail(userId: string) {
+  try {
+    const response = await fetch(`/api/admin/users?id=${userId}`);
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.email;
+  } catch (err) {
+    console.error('Error getting user email:', err);
+    return null;
+  }
+}
+
 export function getListingSection(listing: Listing): SectionId | null {
   if (listing.sectionId) return listing.sectionId;
   

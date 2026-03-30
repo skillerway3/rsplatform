@@ -1,235 +1,154 @@
 'use client';
 
 import * as React from 'react';
-import { Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { ChatSidebar } from '@/components/messages/ChatSidebar';
 import { ChatWindow } from '@/components/messages/ChatWindow';
-import type { Conversation, Message } from '@/types';
+import { Conversation, Message } from '@/types';
 import { toast } from 'sonner';
 
-type ConversationPerson = {
-  username: string | null;
-  avatar_url: string | null;
-};
-
-type ConversationListing = {
-  title: string | null;
-};
-
-type ConversationRow = {
-  id: string;
-  buyer_id: string;
-  seller_id: string;
-  listing_id?: string | null;
-  last_message_at?: string | null;
-  buyer_last_read_at?: string | null;
-  seller_last_read_at?: string | null;
-  last_message_by?: string | null;
-  buyer: ConversationPerson | null;
-  seller: ConversationPerson | null;
-  listing: ConversationListing | null;
-  [key: string]: unknown;
-};
-
-type UIConversation = ConversationRow & {
-  other_person: ConversationPerson | null;
-};
-
-type UIMessage = {
-  id: string;
-  conversation_id: string;
-  sender_id: string;
-  content: string;
-  created_at: string;
-  is_read?: boolean | null;
-  [key: string]: unknown;
-};
-
-function MessagesPageFallback() {
+export default function MessagesPage() {
   return (
-    <div className="pt-24 bg-zinc-950 h-screen flex items-center justify-center">
-      <div className="text-amber-500 animate-pulse font-black uppercase tracking-widest">
-        Loading Frequencies...
+    <React.Suspense fallback={
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
       </div>
-    </div>
+    }>
+      <MessagesContent />
+    </React.Suspense>
   );
 }
 
-function MessagesPageContent() {
+function MessagesContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const chatId = searchParams.get('chat');
 
   const [currentUserId, setCurrentUserId] = React.useState<string | null>(null);
-  const [conversations, setConversations] = React.useState<UIConversation[]>([]);
-  const [selectedConvo, setSelectedConvo] = React.useState<UIConversation | null>(null);
-  const [messages, setMessages] = React.useState<UIMessage[]>([]);
+  const [conversations, setConversations] = React.useState<Conversation[]>([]);
+  const [selectedConvo, setSelectedConvo] = React.useState<Conversation | null>(null);
+  const [messages, setMessages] = React.useState<Message[]>([]);
   const [messageText, setMessageText] = React.useState('');
   const [isMobileListOpen, setIsMobileListOpen] = React.useState(!chatId);
   const [loading, setLoading] = React.useState(true);
 
-  const selectedConvoRef = React.useRef<UIConversation | null>(null);
-  const isFirstLoad = React.useRef(true);
-
+  // Use a ref for the selected conversation to avoid stale closures in subscriptions
+  const selectedConvoRef = React.useRef<Conversation | null>(null);
   React.useEffect(() => {
     selectedConvoRef.current = selectedConvo;
   }, [selectedConvo]);
 
+  // 1. Get current user
   React.useEffect(() => {
-    setIsMobileListOpen(!chatId);
-  }, [chatId]);
-
-  React.useEffect(() => {
-    const getCurrentUser = async () => {
-      const { data } = await supabase.auth.getUser();
+    supabase.auth.getUser().then(({ data }) => {
       setCurrentUserId(data.user?.id ?? null);
-
-      if (!data.user) {
-        setLoading(false);
-      }
-    };
-
-    void getCurrentUser();
+      if (!data.user) setLoading(false);
+    });
   }, []);
 
-  const fetchConversations = React.useCallback(
-    async (uid: string, isInitial = false) => {
-      if (isInitial) setLoading(true);
+  // 2. Fetch conversations
+  const fetchConversations = React.useCallback(async (uid: string, isInitial = false) => {
+    if (isInitial) setLoading(true);
+    
+    const { data, error } = await supabase
+      .from('conversations')
+      .select(`
+        *,
+        listing:listings(title),
+        buyer:profiles!buyer_id(username, avatar_url),
+        seller:profiles!seller_id(username, avatar_url)
+      `)
+      .or(`buyer_id.eq.${uid},seller_id.eq.${uid}`)
+      .order('last_message_at', { ascending: false });
 
-      const { data, error } = await supabase
-        .from('conversations')
-        .select(`
-          *,
-          listing:listings(title),
-          buyer:profiles!buyer_id(username, avatar_url),
-          seller:profiles!seller_id(username, avatar_url)
-        `)
-        .or(`buyer_id.eq.${uid},seller_id.eq.${uid}`)
-        .order('last_message_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching conversations:', error);
-        setLoading(false);
-        return;
-      }
-
-      const rows = (data ?? []) as ConversationRow[];
-
-      const formatted = rows.map((convo): UIConversation => {
-        const buyer = convo.buyer
-          ? {
-              username: convo.buyer.username ?? null,
-              avatar_url: convo.buyer.avatar_url ?? null,
-            }
-          : null;
-
-        const seller = convo.seller
-          ? {
-              username: convo.seller.username ?? null,
-              avatar_url: convo.seller.avatar_url ?? null,
-            }
-          : null;
-
-        const listing = convo.listing
-          ? {
-              title: convo.listing.title ?? null,
-            }
-          : null;
-
-        return {
-          ...convo,
-          id: String(convo.id),
-          buyer_id: String(convo.buyer_id),
-          seller_id: String(convo.seller_id),
-          listing_id: convo.listing_id ? String(convo.listing_id) : null,
-          last_message_at:
-            typeof convo.last_message_at === 'string' ? convo.last_message_at : null,
-          buyer_last_read_at:
-            typeof convo.buyer_last_read_at === 'string' ? convo.buyer_last_read_at : null,
-          seller_last_read_at:
-            typeof convo.seller_last_read_at === 'string' ? convo.seller_last_read_at : null,
-          last_message_by:
-            typeof convo.last_message_by === 'string' ? convo.last_message_by : null,
-          buyer,
-          seller,
-          listing,
-          other_person: convo.buyer_id === uid ? seller : buyer,
-        };
-      });
-
-      setConversations(formatted);
-
-      if (chatId) {
-        const found = formatted.find((c) => c.id === String(chatId));
-        setSelectedConvo(found ?? null);
-      } else {
-        setSelectedConvo(null);
-      }
-
+    if (error) {
+      console.error('Error fetching conversations:', error);
       setLoading(false);
-    },
-    [chatId]
-  );
+      return;
+    }
 
+    const formatted = (data as (Conversation & { 
+      buyer: { username: string; avatar_url: string | null }; 
+      seller: { username: string; avatar_url: string | null }; 
+      listing: { title: string } 
+    })[]).map(convo => ({
+      ...convo,
+      other_person: convo.buyer_id === uid ? convo.seller : convo.buyer
+    }));
+
+    setConversations(formatted);
+    
+    // If there's a chatId in URL, select it
+    if (chatId) {
+      const found = formatted.find(c => c.id === chatId);
+      if (found) setSelectedConvo(found);
+    }
+
+    setLoading(false);
+  }, [chatId]);
+
+  const isFirstLoad = React.useRef(true);
   React.useEffect(() => {
-    if (!currentUserId) return;
-
-    void fetchConversations(currentUserId, isFirstLoad.current);
-    isFirstLoad.current = false;
+    if (currentUserId) {
+      fetchConversations(currentUserId, isFirstLoad.current);
+      isFirstLoad.current = false;
+    }
   }, [currentUserId, fetchConversations]);
 
+  // 3. Global Realtime Subscriptions
   React.useEffect(() => {
     if (!currentUserId) return;
 
+    // Listen for ALL message inserts to update sidebar and current chat
     const msgChannel = supabase
       .channel('global_messages')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload) => {
-          const newMessage = payload.new as UIMessage;
-
-          if (
-            selectedConvoRef.current &&
-            newMessage.conversation_id === selectedConvoRef.current.id
-          ) {
-            setMessages((prev) => {
-              if (prev.some((m) => m.id === newMessage.id)) return prev;
+          const newMessage = payload.new as Message;
+          
+          // Update chat window if it's the active conversation
+          if (selectedConvoRef.current && newMessage.conversation_id === selectedConvoRef.current.id) {
+            setMessages(prev => {
+              if (prev.some(m => m.id === newMessage.id)) return prev;
               return [...prev, newMessage];
             });
           }
-
-          void fetchConversations(currentUserId);
+          
+          // Refresh conversations to update sidebar (unread indicators, last message)
+          fetchConversations(currentUserId);
         }
       )
       .subscribe();
 
+    // Listen for conversation updates (last_read_at, last_message_at)
     const convoChannel = supabase
       .channel('global_conversations')
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'conversations' },
         () => {
-          void fetchConversations(currentUserId);
+          fetchConversations(currentUserId);
         }
       )
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'conversations' },
         () => {
-          void fetchConversations(currentUserId);
+          fetchConversations(currentUserId);
         }
       )
       .subscribe();
 
     return () => {
-      void supabase.removeChannel(msgChannel);
-      void supabase.removeChannel(convoChannel);
+      supabase.removeChannel(msgChannel);
+      supabase.removeChannel(convoChannel);
     };
   }, [currentUserId, fetchConversations]);
 
+  // 4. Fetch messages for selected conversation
   React.useEffect(() => {
     if (!selectedConvo) {
       setMessages([]);
@@ -248,30 +167,29 @@ function MessagesPageContent() {
         return;
       }
 
-      setMessages((data ?? []) as UIMessage[]);
+      setMessages(data as Message[]);
     };
 
-    void fetchMessages();
+    fetchMessages();
   }, [selectedConvo]);
 
+  // 5. Mark as read logic
   React.useEffect(() => {
     if (!selectedConvo || !currentUserId) return;
 
     const markAsRead = async () => {
       const isSeller = currentUserId === selectedConvo.seller_id;
       const field = isSeller ? 'seller_last_read_at' : 'buyer_last_read_at';
-
+      
       const { error } = await supabase
         .from('conversations')
         .update({ [field]: new Date().toISOString() })
         .eq('id', selectedConvo.id);
 
-      if (error) {
-        console.error('Error marking as read:', error);
-      }
+      if (error) console.error('Error marking as read:', error);
     };
 
-    void markAsRead();
+    markAsRead();
   }, [selectedConvo, currentUserId, messages.length]);
 
   const handleSendMessage = async () => {
@@ -285,7 +203,7 @@ function MessagesPageContent() {
       .insert({
         conversation_id: selectedConvo.id,
         sender_id: currentUserId,
-        content,
+        content
       })
       .select()
       .single();
@@ -296,29 +214,28 @@ function MessagesPageContent() {
       return;
     }
 
-    const { error: convoError } = await supabase
+    // Update conversation last_message_at
+    await supabase
       .from('conversations')
       .update({
         last_message_at: new Date().toISOString(),
-        last_message_by: currentUserId,
+        last_message_by: currentUserId
       })
       .eq('id', selectedConvo.id);
-
-    if (convoError) {
-      console.error('Error updating conversation:', convoError);
-    }
   };
 
   if (loading) {
-    return <MessagesPageFallback />;
+    return (
+      <div className="pt-24 bg-zinc-950 h-screen flex items-center justify-center">
+        <div className="text-amber-500 animate-pulse font-black uppercase tracking-widest">Loading Frequencies...</div>
+      </div>
+    );
   }
 
   if (!currentUserId) {
     return (
       <div className="pt-24 bg-zinc-950 h-screen flex items-center justify-center">
-        <div className="text-zinc-500 font-black uppercase tracking-widest">
-          Access Denied. Please Login.
-        </div>
+        <div className="text-zinc-500 font-black uppercase tracking-widest">Access Denied. Please Login.</div>
       </div>
     );
   }
@@ -326,22 +243,21 @@ function MessagesPageContent() {
   return (
     <div className="pt-24 bg-zinc-950 h-screen overflow-hidden flex flex-col">
       <div className="flex-1 container mx-auto px-6 pb-6 flex gap-6 overflow-hidden">
-        <ChatSidebar
-          conversations={conversations as unknown as Conversation[]}
+        <ChatSidebar 
+          conversations={conversations}
           selectedChatId={selectedConvo?.id || ''}
-          onSelectChat={(convo: Conversation) => {
-            const selected = convo as unknown as UIConversation;
-            setSelectedConvo(selected);
+          onSelectChat={(convo) => {
+            setSelectedConvo(convo);
             setIsMobileListOpen(false);
-            router.push(`/messages?chat=${selected.id}`, { scroll: false });
+            router.push(`/messages?chat=${convo.id}`, { scroll: false });
           }}
           isMobileListOpen={isMobileListOpen}
           currentUserId={currentUserId}
         />
 
-        <ChatWindow
-          conversation={selectedConvo as unknown as Conversation | null}
-          messages={messages as unknown as Message[]}
+        <ChatWindow 
+          conversation={selectedConvo}
+          messages={messages}
           currentUserId={currentUserId}
           isMobileListOpen={isMobileListOpen}
           onBack={() => {
@@ -354,13 +270,5 @@ function MessagesPageContent() {
         />
       </div>
     </div>
-  );
-}
-
-export default function MessagesPage() {
-  return (
-    <Suspense fallback={<MessagesPageFallback />}>
-      <MessagesPageContent />
-    </Suspense>
   );
 }

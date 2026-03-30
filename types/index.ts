@@ -96,6 +96,7 @@ export interface Conversation {
   buyer_last_read_at?: string | null;
   seller_last_read_at?: string | null;
   last_message_by?: string | null;
+  created_at?: string | null;
   buyer?: ConversationPerson | null;
   seller?: ConversationPerson | null;
   listing?: ConversationListing | null;

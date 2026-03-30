@@ -21,6 +21,7 @@ import { cn, isAdmin } from '@/lib/utils';
 interface Profile {
   id: string;
   username: string;
+  email: string;
   full_name: string;
   avatar_url: string;
   is_verified_seller: boolean;
@@ -41,15 +42,25 @@ export default function AdminSellersPage() {
 
   const fetchProfiles = React.useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, username, full_name, avatar_url, is_verified_seller, is_trusted_seller, manual_trusted_override, average_rating, review_count, created_at')
-      .order('created_at', { ascending: false });
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No session');
 
-    if (!error && data) {
+      const response = await fetch('/api/admin/users', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch users');
+      const data = await response.json();
       setProfiles(data);
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Error fetching admin profiles:', error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   const checkAdmin = React.useCallback(async () => {
@@ -162,6 +173,7 @@ export default function AdminSellersPage() {
                   <div>
                     <div className="flex items-center gap-3 mb-1">
                       <h3 className="font-black uppercase tracking-widest text-sm">{profile.username}</h3>
+                      <span className="text-[10px] text-zinc-500 font-medium lowercase tracking-normal">({profile.email})</span>
                       {profile.is_verified_seller && (
                         <div className="flex items-center gap-1 px-1.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md">
                           <ShieldCheck className="w-2.5 h-2.5 text-emerald-500" />

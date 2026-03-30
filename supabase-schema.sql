@@ -145,6 +145,7 @@ CREATE TABLE IF NOT EXISTS buyer_requests (
   budget_max NUMERIC,
   status TEXT DEFAULT 'open', -- open, closed, matched, in_progress, delivered, resolved, refunded, disputed, expired
   accepted_offer_id UUID,
+  seller_notified_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   expires_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '24 hours')
 );

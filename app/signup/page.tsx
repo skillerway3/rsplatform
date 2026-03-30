@@ -33,7 +33,7 @@ export default function SignupPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/dashboard`,
+          redirectTo: `${window.location.origin}/`,
         },
       });
       if (error) throw error;
@@ -52,10 +52,16 @@ export default function SignupPage() {
     setError(null);
 
     try {
+      // Save email to localStorage for resend functionality on verification page
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('pending_verification_email', email);
+      }
+
       const { data, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
+          emailRedirectTo: `${window.location.origin}/auth/verify`,
           data: {
             username: username,
           }
@@ -65,12 +71,12 @@ export default function SignupPage() {
       if (authError) throw authError;
 
       if (data.user) {
-        if (!data.session) {
-          setError('Account created! Please check your email to verify your account before logging in.');
-          setLoading(false);
+        if (data.session) {
+          router.push('/');
+        } else {
+          router.push(`/auth/verify?email=${encodeURIComponent(email)}`);
           return;
         }
-        router.push('/dashboard');
         router.refresh();
       }
     } catch (err: unknown) {
